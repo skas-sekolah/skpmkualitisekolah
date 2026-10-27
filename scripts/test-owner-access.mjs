@@ -1,0 +1,50 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+
+// Owner security boundaries with isolated Auth/database fixtures.
+const compile=s=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
+const modules=new Map();
+function moduleURL(file){
+ if(modules.has(file))return modules.get(file);
+ let source=fs.readFileSync(file,'utf8');
+ source=source.replace(/import source from '\.\/rubric.json' with \{type:'json'\};/,'const source='+fs.readFileSync('migration/backend/rubric.json','utf8')+';');
+ source=source.replace(/from '(\.\/[^']+\.ts)'/g,(_,rel)=>'from '+JSON.stringify(moduleURL(path.resolve(path.dirname(file),rel))));
+ source=source.replace("import {createClient} from 'npm:@supabase/supabase-js@2.102.0';",'const createClient=()=>globalThis.__schoolTestDB;');
+ const url=compile(source);modules.set(file,url);return url;
+}
+const {ownerApi}=await import(moduleURL(path.resolve('migration/backend/owner-api.ts')));
+const tables={s4_platform_owners:[{id:'platform-owner',auth_user_id:'owner-auth',enabled:true,must_change_password:false}],s4_owner_sessions:[],s4_schools:[]};
+const users=new Map([['owner-auth',{email:'owner@example.invalid',password:'owner-example-password'}],['school-auth',{email:'admin@example.invalid',password:'admin-example-password'}]]);
+let writes=0;
+const db={from(table){let mode='read',value,filters=[];const q={select(){return q;},order(){return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},is(k,v){return q.eq(k,v);},gt(k,v){filters.push(r=>r[k]>v);return q;},insert(v){mode='insert';value=v;return q;},update(v){mode='update';value=v;return q;},delete(){mode='delete';return q;},maybeSingle(){return q.then(r=>({...r,data:r.data?.[0]??null}));},then(resolve,reject){return Promise.resolve().then(()=>{const rows=tables[table];assert.ok(rows,'Unexpected table '+table);const matched=rows.filter(r=>filters.every(f=>f(r)));if(mode==='insert'){rows.push(structuredClone(value));writes++;return {data:[value],error:null};}if(mode==='update'){for(const row of matched)Object.assign(row,structuredClone(value));writes++;}if(mode==='delete'){tables[table]=rows.filter(r=>!matched.includes(r));writes++;}let result=structuredClone(matched);if(table==='s4_schools'&&mode==='read')result=result.map(r=>({...r,school:r.data.school,members:r.data.members,teachers:r.data.teachers,assessments:r.data.assessments,audit:r.data.audit}));return {data:result,error:null};}).then(resolve,reject);}};return q;},auth:{async getUser(token){return {data:{user:users.has(token)?{id:token}:null},error:null};},admin:{async createUser(v){const id=crypto.randomUUID();users.set(id,v);return {data:{user:{id}},error:null};},async updateUserById(id,v){Object.assign(users.get(id),v);return {error:null};}}}};
+const signIn=async(uid,pw)=>{if(users.get(uid)?.password!==pw)throw Object.assign(new Error('Incorrect password'),{status:401});return {access_token:uid,refresh_token:'refresh',user:{id:uid}};};
+const api=ownerApi(db,signIn,async()=>{throw Error('Unexpected refresh');},async()=>{});
+const request=(token)=>new Request('https://example.invalid',{headers:token?{authorization:'Bearer '+token}:{}});
+await assert.rejects(()=>api.route(request(),{method:'GET'}),e=>e.status===401);
+await assert.rejects(()=>api.route(request('school-auth'),{method:'GET',sid:'0'.repeat(64),expected:'platform-owner'}),e=>e.status===403);
+assert.equal(writes,0,'Denied school Admin must never write');
+const logged=await api.login('owner-example-password');assert.equal(logged.session.isSuperAdmin,true);assert.equal(logged.session.isAdmin,false);
+const b={method:'GET',sid:logged.tokens.sid,expected:'platform-owner'};
+await assert.rejects(()=>api.route(request('owner-auth'),{...b,sid:'f'.repeat(64)}),e=>e.status===401);
+await assert.rejects(()=>api.route(request('owner-auth'),{...b,expected:'somebody-else'}),e=>e.status===401);
+tables.s4_schools.push({id:'school-one',code:'ABC001',revision:1,enabled:true,data:{school:{id:'school-one',code:'ABC001',name:'Fixture school'},members:[{id:'school-admin',username:'admin',role:'admin',displayName:'Admin',active:1,authUserId:'school-auth',privateField:'DO-NOT-EXPOSE'}],teachers:[],assessments:[{scores:[4]}],sessions:[{hash:'secret-school-session'}],invitations:[],audit:[]}});
+const listing=await api.route(request('owner-auth'),b);assert.equal(listing.schools[0].accounts,1);assert.equal(JSON.stringify(listing).includes('DO-NOT-EXPOSE'),false);assert.equal(JSON.stringify(listing).includes('secret-school-session'),false);assert.equal(JSON.stringify(listing).includes('scores'),false);
+tables.s4_platform_owners[0].must_change_password=true;await assert.rejects(()=>api.route(request('owner-auth'),b),e=>e.status===403);tables.s4_platform_owners[0].must_change_password=false;
+const post=body=>api.route(request('owner-auth'),{...b,method:'POST',body});
+await assert.rejects(()=>post({action:'school-code',schoolId:'school-one',revision:0,confirmation:'ABC001',code:'ABC002'}),e=>e.status===409);
+await assert.rejects(()=>post({action:'school-code',schoolId:'school-one',revision:1,confirmation:'WRONG',code:'ABC002'}));
+await assert.rejects(()=>post({action:'school-code',schoolId:'school-one',revision:1,confirmation:'ABC001',code:'SUPERADMIN'}));
+await post({action:'school-code',schoolId:'school-one',revision:1,confirmation:'ABC001',code:'ABC002'});let school=tables.s4_schools[0];assert.equal(school.code,'ABC002');assert.equal(school.data.school.code,'ABC002');assert.equal(school.data.assessments.length,1);assert.equal(school.data.audit[0].actorId,'platform-owner');
+await post({action:'school-status',schoolId:'school-one',revision:2,confirmation:'ABC002',enabled:false});assert.equal(school.enabled,false);assert.deepEqual(school.data.sessions,[]);assert.equal(school.data.assessments.length,1);
+await assert.rejects(()=>post({action:'delete-school',schoolId:'school-one'}));
+await api.sessionRoute(request('owner-auth'),{...b,method:'POST',body:{action:'logout'}});await assert.rejects(()=>api.route(request('owner-auth'),b),e=>e.status===401);
+const salt=crypto.getRandomValues(new Uint8Array(16)),testPassword='Fixture-initial-password';const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(testPassword),'PBKDF2',false,['deriveBits']);const hashBytes=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:600000},key,256);const hex=a=>[...new Uint8Array(a)].map(n=>n.toString(16).padStart(2,'0')).join('');
+Object.assign(tables.s4_platform_owners[0],{auth_user_id:null,bootstrap_salt:hex(salt),bootstrap_hash:hex(hashBytes),must_change_password:true});
+await assert.rejects(()=>api.login('Wrong-initial-password'),e=>e.status===401);
+const bootstrap=await api.login(testPassword);assert.equal(bootstrap.session.mustChangePassword,true);assert.equal(tables.s4_platform_owners[0].bootstrap_hash,null);assert.ok(tables.s4_platform_owners[0].auth_user_id);
+const tempBody={method:'POST',sid:bootstrap.tokens.sid,body:{action:'password',oldPassword:testPassword,password:'Fixture-new-private-password'}};const changed=await api.sessionRoute(request(bootstrap.tokens.accessToken),tempBody);assert.equal(changed.session.mustChangePassword,false);assert.equal(tables.s4_owner_sessions.length,1);
+await assert.rejects(()=>api.requireOwner(request(bootstrap.tokens.accessToken),{sid:bootstrap.tokens.sid}),e=>e.status===401);
+tables.s4_owner_sessions[0].expires_at='2000-01-01T00:00:00.000Z';await assert.rejects(()=>api.requireOwner(request(changed.tokens.accessToken),{sid:changed.tokens.sid}),e=>e.status===401);
+console.log('PASS owner: school Admin denied, verified identity, session revocation/expiry, forced password change, bootstrap hashing, safe projections, CAS, preserved scores and audited school changes');

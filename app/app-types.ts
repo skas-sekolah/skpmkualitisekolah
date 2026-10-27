@@ -1,5 +1,5 @@
 import type {AchievementBundle,PendingAchievement} from '../migration/backend/achievement-model';
-type AppSession={memberId:string;schoolId:string;schoolCode:string;schoolName:string;username:string;displayName:string;isAdmin:boolean;isSchoolLeader?:boolean;teacherId:string|null;staffId?:string|null;legacyOwner:boolean};
+type AppSession={memberId:string;schoolId:string;schoolCode:string;schoolName:string;username:string;displayName:string;isAdmin:boolean;isSuperAdmin?:boolean;mustChangePassword?:boolean;isSchoolLeader?:boolean;teacherId:string|null;staffId?:string|null;legacyOwner:boolean};
 import type {Teacher,Assessment} from './scoring';
 import type {RosterInfo} from './roster-ui';
 import type {StrengthBundle,PendingStrength} from '../migration/backend/strength-model';

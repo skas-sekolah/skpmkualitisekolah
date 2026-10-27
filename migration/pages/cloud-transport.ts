@@ -14,4 +14,4 @@ async function send(path:string,init:RequestInit={},retry=true):Promise<Response
  if(r.status===401&&retry&&path!=='/api/session'&&current){if(!refresh)refresh=send('/api/session',{},false).finally(()=>{refresh=null;});const refreshed=await refresh;if(refreshed.ok)return send(path,init,false);}
  if(r.status===401&&path==='/api/session')save(null);return r;
 }
-export function installCloudTransport(){const native=globalThis.fetch.bind(globalThis);globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const path=typeof input==='string'?input:'';return ['/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(path)?send(path,init):native(input,init);}) as typeof fetch;}
+export function installCloudTransport(){const native=globalThis.fetch.bind(globalThis);globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const path=typeof input==='string'?input:'';return ['/api/owner','/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(path)?send(path,init):native(input,init);}) as typeof fetch;}

@@ -67,6 +67,8 @@ function school(code,{pdpc,assessments=[]}={}){
  return {d,context,async save(){d.sessions=[{hash:await D.hash(sid),memberId,expiresAt:'2100-01-01'}];rows.set(id,{id,code,enabled:true,revision:9,data:clone(d)});}};
 }
 try{
+ const reserved=await request({path:'/api/session',method:'POST',body:{action:'register-school',schoolCode:'SUPERADMIN',schoolName:'Fixture reserved',displayName:'Fixture',username:'superadmin',password:'fixture-password'}});assert.equal(reserved.status,403);assert.equal(rows.size,0,'Public registration must not claim owner identity');
+ const wrongOwnerID=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'SUPERADMIN',username:'somebody',password:'fixture-password'}});assert.equal(wrongOwnerID.status,401);
  const registered=await request({path:'/api/session',method:'POST',body:{action:'register-school',schoolCode:'NEW001',schoolName:'Sekolah Rekaan Baharu',displayName:'Admin Rekaan',username:'admin',password:'fixture-password'}});
  assert.equal(registered.status,200);assert.equal(insertedConfig.version,2,'Config must exist on the first INSERT');
  const t=registered.data.tokens,context={schoolId:t.schoolId,sid:t.sid,token:t.accessToken,expected:registered.data.session.memberId};
