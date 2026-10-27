@@ -35,6 +35,8 @@ jobs:
       - run: node scripts/test-achievement-offline.mjs
       - run: node scripts/test-pps.mjs
       - run: node scripts/test-pdpc.mjs
+      - run: node scripts/test-owner-access.mjs
+      - run: node scripts/test-my-tasks.mjs
       - run: node scripts/test-school-registration.mjs
       - run: node scripts/test-progress.mjs
       - run: node scripts/test-assignment-roster.mjs

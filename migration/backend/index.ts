@@ -1,3 +1,4 @@
+import {ownerApi} from './owner-api.ts';
 import {achievementCommand,achievementView} from './achievement-api.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.102.0';
 import {ApiError,fail,text,code,username,password,secret,hash,now,actor,session,audit,getData,dataCommand,getSchool,schoolCommand,initializePdpc,type SchoolDoc,type Row} from './domain.ts';
@@ -8,7 +9,7 @@ const url=Deno.env.get('SUPABASE_URL')!,serviceKey=Deno.env.get('SUPABASE_SERVIC
 const db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
 const allowed=new Set(['https://skas-sekolah.github.io','https://cikgu-khairil-matematik.github.io','https://standard-4-sktd-2026.krel-adam.chatgpt.site']);
 class Retry extends Error{}
-async function load(value:string,byCode=false){const {data,error}=await db.from('s4_schools').select('*').eq(byCode?'code':'id',value).maybeSingle();if(error)fail('Pangkalan data belum dapat dihubungi.',503);if(!data)return null;if(!data.enabled)fail('Ruang sekolah sedang disediakan untuk pemindahan. Gunakan pautan asal buat sementara.',423);return data as Row;}
+async function load(value:string,byCode=false){const {data,error}=await db.from('s4_schools').select('*').eq(byCode?'code':'id',value).maybeSingle();if(error)fail('Pangkalan data belum dapat dihubungi.',503);if(!data)return null;if(!data.enabled)fail('Akses sekolah ini tidak aktif. Hubungi pemilik sistem.',423);return data as Row;}
 async function commit(row:Row){row.data.sessions=row.data.sessions.filter((s:Row)=>s.expiresAt>now());row.data.invitations=row.data.invitations.filter((i:Row)=>i.expiresAt>now());const {data,error}=await db.from('s4_schools').update({data:row.data,code:row.data.school.code,revision:row.revision+1,updated_at:now()}).eq('id',row.id).eq('revision',row.revision).eq('enabled',true).select('id');if(error)fail('Rekod tidak dapat disimpan.',503);if(!data?.length)throw new Retry();}
 async function limit(key:string,max:number,seconds:number){const {data,error}=await db.rpc('s4_rate_limit',{p_key:key,p_max:max,p_seconds:seconds});if(error)fail('Pengesahan permintaan belum tersedia.',503);if(!data)fail('Terlalu banyak percubaan. Cuba semula kemudian.',429);}
 async function auth(path:string,b:Row,access?:string){const r=await fetch(url+'/auth/v1/'+path,{method:path==='user'?'PUT':'POST',headers:{apikey:anon,'Content-Type':'application/json',...(access?{Authorization:'Bearer '+access}:{})},body:JSON.stringify(b),signal:AbortSignal.timeout(15000)});if(!r.ok)fail('Kod sekolah, ID atau kata laluan tidak betul.',401);return await r.json();}
@@ -17,7 +18,11 @@ async function signIn(uid:string,pw:string){return auth('token?grant_type=passwo
 function tokens(t:Row,sid:string,d:SchoolDoc,m:Row){return {accessToken:t.access_token,refreshToken:t.refresh_token,sid,schoolId:d.school.id};}
 async function newSession(row:Row,m:Row,t:Row){const sid=secret();initializePdpc(row.data);row.data.sessions.push({hash:await hash(sid),memberId:m.id,expiresAt:new Date(Date.now()+604800000).toISOString()});await commit(row);return {session:session(row.data,m),tokens:tokens(t,sid,row.data,m)};}
 async function requireUser(req:Request,b:Row){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'');if(!token)fail('Sila log masuk dahulu.',401);const {data,error}=await db.auth.getUser(token);if(error||!data.user)fail('Sesi telah tamat. Log masuk semula.',401);if(typeof b.schoolId!=='string'||typeof b.sid!=='string'||!/^[a-f0-9]{64}$/.test(b.sid))fail('Sesi tidak sah.',401);const row=await load(b.schoolId);if(!row)fail('Akaun tidak ditemui.',401);const m=actor(row.data,data.user.id,await hash(b.sid));if(b.expected&&m.id!==b.expected)fail('Akaun pada pelayar telah berubah. Log masuk semula.',409);if(initializePdpc(row.data)){await commit(row);row.revision++;}return {row,m,uid:data.user.id,token};}
+const owners=ownerApi(db,signIn,auth,limit);
 async function sessionRoute(req:Request,b:Row){const v=b.body||{},action=v.action;
+ if(b.schoolId==='SUPERADMIN'&&(b.method==='GET'||['logout','password'].includes(action)))return owners.sessionRoute(req,b);
+ if(action==='login'&&String(v.schoolCode).trim().toUpperCase()==='SUPERADMIN'){if(String(v.username).trim().toUpperCase()!=='SUPERADMIN')fail('Kod sekolah, ID atau kata laluan tidak betul.',401);return owners.login(v.password);}
+ if(['register-school','activate'].includes(action)&&String(v.schoolCode).trim().toUpperCase()==='SUPERADMIN')fail('Kod ini dikhaskan untuk pemilik sistem.',403);
  if(b.method==='GET'){
   if(!b.schoolId||!b.sid)return {session:null,configured:true};
   try{const {row,m}=await requireUser(req,b);return {session:session(row.data,m),configured:true};}catch(e){if(!(e instanceof ApiError)||e.status!==401||!b.refreshToken)throw e;}
@@ -75,10 +80,11 @@ Deno.serve(async(req:Request)=>{
  try{
   if(!req.headers.get('content-type')?.startsWith('application/json'))fail('Gunakan JSON.',415);const raw=await req.text();if(raw.length>350000)fail('Permintaan terlalu besar.',413);let b:Row;try{b=JSON.parse(raw);}catch{fail('Maklumat tidak sah.');}
   if(!b!||typeof b!=='object'||Array.isArray(b))fail('Maklumat tidak sah.');
-  if(!['/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(b!.path)||!['GET','POST'].includes(b!.method))fail('Laluan tidak sah.',404);
+  if(!['/api/owner','/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(b!.path)||!['GET','POST'].includes(b!.method))fail('Laluan tidak sah.',404);
   const ip=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'shared';await limit('ip:'+await hash(ip),300,600);if(b!.body?.action==='register-school')await limit('register:'+await hash(ip),10,3600);
   for(let attempt=0;attempt<6;attempt++)try{
    if(b!.path==='/api/session')return reply(await sessionRoute(req,b!));
+   if(b!.path==='/api/owner')return reply(await owners.route(req,b!));
    const {row,m}=await requireUser(req,b!);
    if(b!.path==='/api/resources'){
     if(b!.body?.action==='load')return reply(resourcesView(row.data,m,b!.body.year));
