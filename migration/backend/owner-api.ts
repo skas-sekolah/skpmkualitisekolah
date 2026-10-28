@@ -1,9 +1,11 @@
+import {schoolDeletion} from './owner-delete.ts';
 import {ApiError,fail,hash,secret,now,password,code,audit,schoolCommand,type Row} from './domain.ts';
 
 // Owner identity is a server-managed allowlist, never a school role or a
 // client-editable Auth claim. Every request needs both a verified Auth user
 // and an unexpired, revocable application capability.
 export function ownerApi(db:any,signIn:(uid:string,pw:string)=>Promise<Row>,auth:(path:string,b:Row)=>Promise<Row>,limit:(key:string,max:number,seconds:number)=>Promise<void>){
+ const deletions=schoolDeletion(db);
  const session=(o:Row)=>({memberId:o.id,schoolId:'SUPERADMIN',schoolCode:'SUPERADMIN',schoolName:'Pengurusan SK@S',username:'SUPERADMIN',displayName:'Super Admin',isAdmin:false,isSuperAdmin:true,mustChangePassword:o.must_change_password,teacherId:null,legacyOwner:false});
  async function owner(){const {data,error}=await db.from('s4_platform_owners').select('*').eq('id','platform-owner').eq('enabled',true).maybeSingle();if(error)fail('Pengesahan pemilik belum tersedia.',503);if(!data)fail('Kod sekolah, ID atau kata laluan tidak betul.',401);return data as Row;}
  async function checkSession(o:Row,b:Row){if(typeof b.sid!=='string'||!/^[a-f0-9]{64}$/.test(b.sid))fail('Sesi tidak sah.',401);const {data,error}=await db.from('s4_owner_sessions').select('hash').eq('hash',await hash(b.sid)).eq('owner_id',o.id).gt('expires_at',now()).maybeSingle();if(error)fail('Pengesahan sesi belum tersedia.',503);if(!data||b.expected&&b.expected!==o.id)fail('Sesi telah tamat. Log masuk semula.',401);}
@@ -44,9 +46,12 @@ export function ownerApi(db:any,signIn:(uid:string,pw:string)=>Promise<Row>,auth
   const o=await requireOwner(req,b);await limit('owner-read:'+o.id,120,600);const v=b.body||{};
   if(b.method==='GET'){
    const {data,error}=await db.from('s4_schools').select('id,code,enabled,revision,updated_at,school:data->school,members:data->members,teachers:data->teachers,assessments:data->assessments,audit:data->audit').order('code');if(error)fail('Senarai sekolah belum tersedia.',503);
-   return {schools:data.map((r:Row)=>({id:r.id,code:r.code,name:r.school.name,enabled:r.enabled,revision:r.revision,updatedAt:r.updated_at,accounts:(r.members||[]).length,teachers:(r.teachers||[]).length,assessments:(r.assessments||[]).length,admins:(r.members||[]).filter((m:Row)=>m.role==='admin').map((m:Row)=>({id:m.id,username:m.username,name:m.displayName,active:m.active===1}))})),events:data.flatMap((r:Row)=>(r.audit||[]).filter((a:Row)=>a.actorId===o.id).map((a:Row)=>({id:a.id,schoolCode:r.code,action:a.action,createdAt:a.createdAt}))).sort((a:Row,b:Row)=>b.createdAt.localeCompare(a.createdAt)).slice(0,100)};
+   const receipts=await db.from('s4_owner_deletions').select('id,school_code,created_at,pending_auth').eq('actor_id',o.id).order('created_at',{ascending:false}).limit(100);if(receipts.error)fail('Sejarah pemadaman belum tersedia.',503);
+   return {schools:data.map((r:Row)=>({id:r.id,code:r.code,name:r.school.name,enabled:r.enabled,revision:r.revision,updatedAt:r.updated_at,accounts:(r.members||[]).length,teachers:(r.teachers||[]).length,assessments:(r.assessments||[]).length,admins:(r.members||[]).filter((m:Row)=>m.role==='admin').map((m:Row)=>({id:m.id,username:m.username,name:m.displayName,active:m.active===1}))})),events:[...receipts.data.map((j:Row)=>({id:j.id,schoolCode:j.school_code,action:'owner_school_deleted',createdAt:j.created_at,cleanupPending:j.pending_auth.length})),...data.flatMap((r:Row)=>(r.audit||[]).filter((a:Row)=>a.actorId===o.id).map((a:Row)=>({id:a.id,schoolCode:r.code,action:a.action,createdAt:a.createdAt})))].sort((a:Row,b:Row)=>b.createdAt.localeCompare(a.createdAt)).slice(0,100)};
   }
   await limit('owner-write:'+o.id,30,600);
+  if(v.action==='delete-school')return deletions.remove(o,b);
+  if(v.action==='retry-school-cleanup')return deletions.retry(o,b);
   if(!['school-code','school-status','reset-admin'].includes(v.action))fail('Tindakan tidak sah.');
   const {data:row,error}=await db.from('s4_schools').select('*').eq('id',v.schoolId).maybeSingle();if(error)fail('Sekolah belum dapat dibaca.',503);if(!row)fail('Sekolah tidak ditemui.',404);
   if(v.revision!==row.revision)fail('Rekod sekolah telah berubah. Muat semula dan cuba lagi.',409);if(v.confirmation!==row.code)fail('Taip kod sekolah semasa untuk mengesahkan.');

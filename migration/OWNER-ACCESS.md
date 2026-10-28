@@ -4,7 +4,7 @@ The existing login page accepts the reserved school code and username
 `SUPERADMIN`. School Admin permissions remain school-scoped. A separate owner
 portal lists registrations, supports code correction and reversible school
 deactivation, and issues recovery codes for active school Admins. No school
-deletion endpoint is provided. School calculations are unchanged.
+deletion endpoint was included in the initial rollout. The draft permanent-deletion extension is documented in OWNER-DELETION.md. School calculations are unchanged.
 
 ## Authorization
 
@@ -30,26 +30,17 @@ deletion endpoint is provided. School calculations are unchanged.
 
 ## Deployment status and sequence
 
-Prepared on 2026-10-27. The private owner schema and bootstrap verifier have
-been provisioned. No existing school document was changed. Production Edge
-function `standard4-api` remains version 23; the new backend and frontend are
-not live. Automatic approval review blocked the production replacement pending
-explicit rollout approval. Do not merge or deploy this draft until approved.
+Initial owner login and school management were approved and published through
+PR #25, production Edge function version 24 and the Pages workflow. The new
+permanent-deletion extension is a separate draft, not deployed; follow
+OWNER-DELETION.md for its schema, authorization and rollout requirements.
 
-After approval:
-
-1. Confirm the current production source and main branch have not changed;
-   reconcile any newer work before deployment.
-2. Verify private table RLS/grants and that exactly the intended owner row is
-   provisioned. Do not reset an existing owner or expose its verifier.
-3. Deploy `migration/backend` including `owner-api.ts` and existing relative
-   dependencies, with `index.ts`, `deno.json`, and existing `verify_jwt=false`
-   (the function performs its own Auth and application-session checks).
-4. Publish frontend sources through the normal main-branch Pages workflow.
-5. Verify the unchanged login page, temporary owner login and mandatory password
-   change gate. The owner enters their new personal password themselves.
-6. Verify ordinary school Admin login and denied cross-school access. Use
-   fixtures, not production school mutations, for destructive-path testing.
+For future owner deployments, confirm that main and live backend source have not
+changed, preserve all existing dependencies, and retain server-side Auth and
+application-session checks. The owner enters their personal password themselves.
+Never put a bootstrap credential or verifier in source or reset an existing owner
+without explicit authorization. Validate ordinary school Admin isolation using
+fixtures rather than production school mutations.
 
 Rollback: restore the previous Edge function source and revert the frontend
 commit. Private owner tables can remain unused. Do not drop school data or undo
