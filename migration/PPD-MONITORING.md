@@ -1,4 +1,4 @@
-# Pegawai PPD monitoring (draft)
+# Pegawai PPD monitoring
 
 The existing login form accepts reserved access code `PPD` and a server-managed
 PPD username (including `@`). The initial requested account is provisioned in the
@@ -7,8 +7,9 @@ credential is stored privately as a salted PBKDF2-SHA256 verifier, 600,000
 iterations. No password or verifier is included in this repository.
 
 After approved activation, first login verifies the bootstrap credential, links
-a dedicated native Supabase Auth identity, clears the verifier, and requires a
-different password of at least 10 characters before monitoring can be accessed.
+a dedicated native Supabase Auth identity, clears the verifier, and permits immediate monitoring with the supplied password. The owner explicitly
+approved retaining that password without a first-login change; activation sets
+`must_change_password=false` for this account. Voluntary password change remains available.
 Subsequent requests verify native Auth, the current enabled PPD allowlist and a
 separate revocable application capability. Capabilities expire after one hour;
 logout and password changes revoke them. School Admin or Super Admin membership,
@@ -81,8 +82,8 @@ After approval:
    function's own native Auth and application-session validation.
 4. Enable only the approved PPD username in the private allowlist; publish this
    frontend through the normal Pages workflow.
-5. Verify the common login page with access code PPD and the mandatory personal
-   password gate. The officer enters their new personal password themselves.
+5. Verify the common login page with access code PPD without a mandatory personal
+   password gate, as explicitly approved.
    Verify monitoring and read-only denials without changing school data.
 
 Rollback by disabling the approved PPD account and removing its application
