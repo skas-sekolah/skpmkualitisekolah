@@ -1,0 +1,15 @@
+import fs from 'node:fs';import ts from 'typescript';import assert from 'node:assert/strict';
+const code=fs.readFileSync('app/ppd-display.ts','utf8').replace(/^import[^\n]+\n/,'');
+const source="const PPD_MODULES=[{id:'strength'},{id:'management'},{id:'achievement'},{id:'standard4'}];\n"+code;
+const display=await import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64'));
+const {emptyCounts,countsFor,filteredSchools,percent,started,sent}=display;
+const make=(code,enabled,counts)=>({id:code,code,name:'Sekolah '+code,enabled,updatedAt:null,modules:{strength:{...emptyCounts(),expected:9,...counts},management:emptyCounts(),achievement:emptyCounts(),standard4:emptyCounts()}});
+const schools=[make('ABC003',true,{verified:9}),make('ABC002',false,{draft:2,returned:1,empty:6}),make('ABC001',true,{empty:9})],f={search:'',stage:'all',status:'all',sort:'progress-up'};
+assert.deepEqual(filteredSchools(schools,'all',f).map(s=>s.code),['ABC001','ABC002','ABC003']);
+assert.equal(filteredSchools(schools,'all',{...f,status:'active'}).length,2);assert.equal(filteredSchools(schools,'all',{...f,status:'inactive'})[0].code,'ABC002');
+assert.equal(filteredSchools(schools,'all',{...f,stage:'returned'})[0].code,'ABC002');assert.equal(filteredSchools(schools,'all',{...f,stage:'submitted'})[0].code,'ABC003','Verified schools also satisfy all sent');
+assert.equal(filteredSchools(schools,'all',{...f,stage:'empty'})[0].code,'ABC001');assert.equal(filteredSchools(schools,'all',{...f,search:' sekolah abc002 '})[0].code,'ABC002');
+assert.deepEqual(filteredSchools(schools,'all',{...f,sort:'progress-down'}).map(s=>s.code),['ABC003','ABC002','ABC001']);
+assert.equal(percent(0,0),null);assert.equal(percent(0,9),0);assert.equal(percent(3,9),33.3);
+const c=countsFor(schools[1],'strength');assert.equal(started(c),3);assert.equal(sent(c),0);assert.deepEqual(countsFor(schools[1],'standard4'),emptyCounts());assert.equal(schools[1].modules.strength.expected,9);
+console.log('PASS PPD filters: module/active/keyword/stage selections, sent includes verified, progress sorting, zero/unknown denominator and count-based percentages');

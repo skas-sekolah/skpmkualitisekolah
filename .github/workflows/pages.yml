@@ -35,6 +35,8 @@ jobs:
       - run: node scripts/test-achievement-offline.mjs
       - run: node scripts/test-pps.mjs
       - run: node scripts/test-pdpc.mjs
+      - run: node scripts/test-ppd.mjs
+      - run: node scripts/test-ppd-filters.mjs
       - run: node scripts/test-owner-access.mjs
       - run: node scripts/test-owner-deletion.mjs
       - run: node scripts/test-my-tasks.mjs

@@ -1,3 +1,4 @@
+import {ppdApi} from './ppd-api.ts';
 import {ownerApi} from './owner-api.ts';
 import {achievementCommand,achievementView} from './achievement-api.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.102.0';
@@ -19,7 +20,11 @@ function tokens(t:Row,sid:string,d:SchoolDoc,m:Row){return {accessToken:t.access
 async function newSession(row:Row,m:Row,t:Row){const sid=secret();initializePdpc(row.data);row.data.sessions.push({hash:await hash(sid),memberId:m.id,expiresAt:new Date(Date.now()+604800000).toISOString()});await commit(row);return {session:session(row.data,m),tokens:tokens(t,sid,row.data,m)};}
 async function requireUser(req:Request,b:Row){const token=req.headers.get('authorization')?.replace(/^Bearer /i,'');if(!token)fail('Sila log masuk dahulu.',401);const {data,error}=await db.auth.getUser(token);if(error||!data.user)fail('Sesi telah tamat. Log masuk semula.',401);if(typeof b.schoolId!=='string'||typeof b.sid!=='string'||!/^[a-f0-9]{64}$/.test(b.sid))fail('Sesi tidak sah.',401);const row=await load(b.schoolId);if(!row)fail('Akaun tidak ditemui.',401);const m=actor(row.data,data.user.id,await hash(b.sid));if(b.expected&&m.id!==b.expected)fail('Akaun pada pelayar telah berubah. Log masuk semula.',409);if(initializePdpc(row.data)){await commit(row);row.revision++;}return {row,m,uid:data.user.id,token};}
 const owners=ownerApi(db,signIn,auth,limit);
+const ppd=ppdApi(db,signIn,auth,limit);
 async function sessionRoute(req:Request,b:Row){const v=b.body||{},action=v.action;
+ if(b.schoolId==='PPD'&&(b.method==='GET'||['logout','password'].includes(action)))return ppd.sessionRoute(req,b);
+ if(action==='login'&&String(v.schoolCode).trim().toUpperCase()==='PPD')return ppd.login(v.username,v.password);
+ if(['register-school','activate'].includes(action)&&String(v.schoolCode).trim().toUpperCase()==='PPD')fail('Kod ini dikhaskan untuk pemantauan PPD.',403);
  if(b.schoolId==='SUPERADMIN'&&(b.method==='GET'||['logout','password'].includes(action)))return owners.sessionRoute(req,b);
  if(action==='login'&&String(v.schoolCode).trim().toUpperCase()==='SUPERADMIN'){if(String(v.username).trim().toUpperCase()!=='SUPERADMIN')fail('Kod sekolah, ID atau kata laluan tidak betul.',401);return owners.login(v.password);}
  if(['register-school','activate'].includes(action)&&String(v.schoolCode).trim().toUpperCase()==='SUPERADMIN')fail('Kod ini dikhaskan untuk pemilik sistem.',403);
@@ -80,10 +85,11 @@ Deno.serve(async(req:Request)=>{
  try{
   if(!req.headers.get('content-type')?.startsWith('application/json'))fail('Gunakan JSON.',415);const raw=await req.text();if(raw.length>350000)fail('Permintaan terlalu besar.',413);let b:Row;try{b=JSON.parse(raw);}catch{fail('Maklumat tidak sah.');}
   if(!b!||typeof b!=='object'||Array.isArray(b))fail('Maklumat tidak sah.');
-  if(!['/api/owner','/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(b!.path)||!['GET','POST'].includes(b!.method))fail('Laluan tidak sah.',404);
+  if(!['/api/ppd','/api/owner','/api/session','/api/data','/api/school','/api/strength','/api/management','/api/resources','/api/achievement'].includes(b!.path)||!['GET','POST'].includes(b!.method))fail('Laluan tidak sah.',404);
   const ip=req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'shared';await limit('ip:'+await hash(ip),300,600);if(b!.body?.action==='register-school')await limit('register:'+await hash(ip),10,3600);
   for(let attempt=0;attempt<6;attempt++)try{
    if(b!.path==='/api/session')return reply(await sessionRoute(req,b!));
+   if(b!.path==='/api/ppd')return reply(await ppd.route(req,b!));
    if(b!.path==='/api/owner')return reply(await owners.route(req,b!));
    const {row,m}=await requireUser(req,b!);
    if(b!.path==='/api/resources'){

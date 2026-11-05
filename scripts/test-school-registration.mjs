@@ -68,6 +68,7 @@ function school(code,{pdpc,assessments=[]}={}){
 }
 try{
  const reserved=await request({path:'/api/session',method:'POST',body:{action:'register-school',schoolCode:'SUPERADMIN',schoolName:'Fixture reserved',displayName:'Fixture',username:'superadmin',password:'fixture-password'}});assert.equal(reserved.status,403);assert.equal(rows.size,0,'Public registration must not claim owner identity');
+ const reservedPPD=await request({path:'/api/session',method:'POST',body:{action:'register-school',schoolCode:'PPD',schoolName:'Fixture PPD',displayName:'Fixture',username:'ppd',password:'fixture-password'}});assert.equal(reservedPPD.status,403);assert.equal(rows.size,0,'Public registration must not claim PPD access');
  const wrongOwnerID=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'SUPERADMIN',username:'somebody',password:'fixture-password'}});assert.equal(wrongOwnerID.status,401);
  const registered=await request({path:'/api/session',method:'POST',body:{action:'register-school',schoolCode:'NEW001',schoolName:'Sekolah Rekaan Baharu',displayName:'Admin Rekaan',username:'admin',password:'fixture-password'}});
  assert.equal(registered.status,200);assert.equal(insertedConfig.version,2,'Config must exist on the first INSERT');
@@ -88,6 +89,8 @@ try{
  const login=school('FIX003');await login.save();
  const signedIn=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}});assert.equal(signedIn.status,200);assert.equal(rows.get(login.context.schoolId).data.pdpc.version,2);
 
+ const ppdToken=crypto.randomUUID();users.set(ppdToken,{email:'ppd@fixture.invalid',password:'fixture-password'});
+ for(const route of ['/api/data','/api/school','/api/strength','/api/management','/api/achievement','/api/resources']){const denied=await request({...login.context,token:ppdToken,path:route,method:'POST',body:{action:'save',year:2026}});assert.equal(denied.status,401,'PPD identity cannot mutate '+route);}
  const existing=school('FIX004',{pdpc:{version:2,epoch:'existing',revision:7,assignments:{2026:[{teacherId:'t',observerId:'teacher:o',reviewerId:'teacher:o'}]}},assessments:[{id:'existing-record',teacherId:'t',year:2026,stage:'pertama',epoch:'existing',total:'88.00',status:'verified'}]});await existing.save();const preserved=clone(rows.get(existing.context.schoolId));assert.equal((await request(existing.context)).status,200);assert.deepEqual(rows.get(existing.context.schoolId),preserved);
  const legacy=school('FIX005',{assessments:[{id:'legacy-record',teacherId:'t',year:2026,total:'72.00'}]});await legacy.save();const legacyBefore=clone(rows.get(legacy.context.schoolId));assert.equal((await request(legacy.context)).status,200);assert.deepEqual(rows.get(legacy.context.schoolId),legacyBefore,'Legacy assessments require an explicit migration; never reset them during login');
  const archived=school('FIX006');await archived.save();rows.get(archived.context.schoolId).enabled=false;const archivedBefore=clone(rows.get(archived.context.schoolId));assert.equal((await request(archived.context)).status,423);assert.deepEqual(rows.get(archived.context.schoolId),archivedBefore);
