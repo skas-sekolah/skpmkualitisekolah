@@ -44,3 +44,18 @@ console.log('PASS three Standard 4 sessions: legacy shared observer for both rou
  const recovered=new C.OfflineEngine(session,()=>connected,transport,async record=>{encrypted=record;});await recovered.unlock(encrypted,password);assert.deepEqual(recovered.state().pending.map(p=>p.assessment.stage).sort(),['kedua','pertama']);connected=true;await recovered.sync();assert.equal(recovered.state().pending.length,0);assert.equal(doc.assessments.length,2);assert.equal(doc.assessments.find(a=>a.stage==='pertama').total,'100.00');assert.equal(doc.assessments.find(a=>a.stage==='kedua').total,'0.00');
  console.log('PASS offline observation rounds: separate encrypted drafts, recovery and sync preserve both records and zero scores.');
 }
+
+{
+ const claim={action:'pdpc-claim-observation',year:2027,stage:'pertama',teacherId:'t',revision:d.pdpc.revision};
+ denied('mt',claim,403);
+ denied('mo',{...claim,teacherId:'o'},400);
+ call('mo',claim);
+ denied('mr',claim,409);
+ denied('mr',{...claim,revision:d.pdpc.revision},409);
+ assert.deepEqual(d.pdpc.assignments['2027'],[{teacherId:'t',observerId:'mo',observer2Id:null,reviewerId:null}]);
+ assert.deepEqual(D.getData(d,d.members.find(m=>m.id==='mr')).pdpc.occupiedObservations['2027'].pertama,['t']);
+ assert.equal(D.getData(d,d.members.find(m=>m.id==='mt')).pdpc.occupiedObservations,undefined);
+ assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'pertama',2027),true);
+ assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'kedua',2027),false);
+ console.log('PASS PdPc self-assignment: eligible leaders only, no self-observation or reassignment, independent rounds and year.');
+}

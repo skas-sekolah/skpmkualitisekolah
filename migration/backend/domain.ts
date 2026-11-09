@@ -57,7 +57,23 @@ export function assignmentPeople(d:SchoolDoc,year?:number){return [
 export function mayView(d:SchoolDoc,m:Row,t:Row,year?:number){if(d.pdpc?.version===2)return m.role==='admin'||t.id===m.teacherId||Object.entries(d.pdpc.assignments).some(([y,rows])=>(year===undefined||String(year)===y)&&rows.some(r=>r.teacherId===t.id&&[r.observerId,observationOfficer(r,'kedua'),r.reviewerId].some(id=>eligibleScoreAssignee(d,id,true,Number(y))&&assignedTo(d,id,m.id))));const o=own(d,m);return m.role==='admin'||t.id===m.teacherId||!!o&&(normalized(t.pp1)===normalized(o.name)||normalized(t.pp2)===normalized(o.name));}
 export function mayWrite(d:SchoolDoc,m:Row,t:Row,stage:string,year?:number){if(!rosterActive(t,year))return false;if(d.pdpc?.version===2){if(!stages.includes(stage as typeof stages[number]))return false;if(stage==='kendiri')return t.id===m.teacherId;return (d.pdpc.assignments[String(year)]??[]).some(r=>r.teacherId===t.id&&eligibleScoreAssignee(d,observationOfficer(r,stage),true,year)&&assignedTo(d,observationOfficer(r,stage),m.id)&&m.teacherId!==t.id);}if(m.role==='admin')return true;if(stage==='kendiri')return t.id===m.teacherId;const o=own(d,m);return !!o&&normalized(stage==='pertama'?t.pp1:t.pp2)===normalized(o.name);}
 export function audit(d:SchoolDoc,m:Row,action:string,id:string,before:unknown,after:unknown){d.audit.push({id:crypto.randomUUID(),schoolId:d.school.id,actorId:m.id,action,entityId:id,before:before==null?null:JSON.stringify(before),after:after==null?null:JSON.stringify(after),createdAt:now()});}
-export function getData(d:SchoolDoc,m:Row){const teachers=d.teachers.filter(t=>mayView(d,m,t)),ids=new Set(teachers.map(t=>t.id));return {rosterRevision:d.rosterRevision??0,staff:m.role==='admin'?(d.staff??[]).map(t=>({...t,status:'AKP',type:''})):undefined,teachers:teachers.map(t=>{const copy={...t};if(m.role!=='admin'&&t.id!==m.teacherId)delete copy.ic;return copy;}),assessments:d.assessments.filter(a=>ids.has(a.teacherId)&&mayView(d,m,teachers.find(t=>t.id===a.teacherId)!,a.year)),rosterInfo:[...d.imports].sort((a,b)=>b.importedAt.localeCompare(a.importedAt))[0]??null,session:session(d,m),pdpc:d.pdpc?{...d.pdpc,assignments:Object.fromEntries(Object.entries(d.pdpc.assignments).map(([y,rows])=>[y,rows.filter(r=>ids.has(r.teacherId))])),people:assignmentPeople(d)}:undefined};}
+function occupiedObservations(d:SchoolDoc){
+ const occupied:Record<string,Record<string,string[]>>={};
+ function add(year:string,stage:string,teacherId:string){
+  const sessions=occupied[year]??={};
+  (sessions[stage]??=[]).push(teacherId);
+ }
+ for(const [year,rows] of Object.entries(d.pdpc?.assignments??{})){
+  for(const row of rows)for(const stage of ['pertama','kedua']){
+   if(observationOfficer(row,stage))add(year,stage,row.teacherId);
+  }
+ }
+ for(const a of d.assessments){
+  if(a.stage!=='kendiri'&&a.status!=='draft')add(String(a.year),a.stage,a.teacherId);
+ }
+ return occupied;
+}
+export function getData(d:SchoolDoc,m:Row){const teachers=d.teachers.filter(t=>mayView(d,m,t)),ids=new Set(teachers.map(t=>t.id));return {rosterRevision:d.rosterRevision??0,staff:m.role==='admin'?(d.staff??[]).map(t=>({...t,status:'AKP',type:''})):undefined,teachers:teachers.map(t=>{const copy={...t};if(m.role!=='admin'&&t.id!==m.teacherId)delete copy.ic;return copy;}),assessments:d.assessments.filter(a=>ids.has(a.teacherId)&&mayView(d,m,teachers.find(t=>t.id===a.teacherId)!,a.year)),rosterInfo:[...d.imports].sort((a,b)=>b.importedAt.localeCompare(a.importedAt))[0]??null,session:session(d,m),pdpc:d.pdpc?{...d.pdpc,assignments:Object.fromEntries(Object.entries(d.pdpc.assignments).map(([y,rows])=>[y,rows.filter(r=>ids.has(r.teacherId))])),people:assignmentPeople(d),occupiedObservations:schoolLeader(own(d,m)?.position)?occupiedObservations(d):undefined}:undefined};}
 function roster(v:Row){if(!v||!['perdana','khas'].includes(v.type))fail('Kategori guru tidak sah.');const r:Row={name:text(v.name),type:v.type};for(const f of ['pp1','pp2','position','grade','session'])if(v[f]!==undefined){if(typeof v[f]!=='string'||v[f].length>180)fail('Maklumat guru tidak sah.');r[f]=v[f].trim();}if(v.sourceNumber!==undefined){if(!Number.isInteger(v.sourceNumber)||v.sourceNumber<0||v.sourceNumber>10000)fail('Nombor rujukan tidak sah.');r.sourceNumber=v.sourceNumber;}return r;}
 function revoke(d:SchoolDoc,ids:string[]){d.sessions=d.sessions.filter(s=>!ids.includes(s.memberId));}
 export function dataCommand(d:SchoolDoc,m:Row,b:Row){
@@ -68,6 +84,24 @@ export function dataCommand(d:SchoolDoc,m:Row,b:Row){
   const targets=b.references.map((ref:unknown)=>{if(typeof ref!=='string')fail('Rujukan tidak sah.');const staff=ref.startsWith('staff:'),teacher=ref.startsWith('teacher:');if(!staff&&!teacher)fail('Rujukan tidak sah.');const row=(staff?d.staff??[]:d.teachers).find(t=>t.id===ref.slice(staff?6:8));if(!row)fail('Nama tidak ditemui.',404);return row;});
   const before=structuredClone(targets);for(const row of targets){if(b.mode==='reactivate'){delete row.inactiveFromYear;delete row.inactiveReason;}else{row.inactiveFromYear=b.fromYear;row.inactiveReason=b.reason.trim();}}
   d.rosterRevision=(d.rosterRevision??0)+1;audit(d,m,'roster_'+b.mode,d.school.id,before,targets);return {updated:targets.length};
+ }
+ if(b.action==='pdpc-claim-observation'){
+  if(!Number.isInteger(b.year)||b.year<2020||b.year>2100||!['pertama','kedua'].includes(b.stage))fail('Tahun atau sesi pencerapan tidak sah.');
+  const config=d.pdpc;
+  if(!config||config.version!==2||b.revision!==config.revision)fail('Tetapan berubah. Muat semula dahulu.',409);
+  if(!eligibleScoreAssignee(d,m.id,true,b.year))fail('Pilihan ini hanya untuk pentadbir sekolah yang aktif.',403);
+  if(m.teacherId===b.teacherId||!d.teachers.some(t=>t.id===b.teacherId&&rosterActive(t,b.year)))fail('Pilih guru lain yang aktif dalam tahun pelaporan.');
+  const rows=config.assignments[String(b.year)]??[];
+  const existing=rows.find(r=>r.teacherId===b.teacherId);
+  const current=observationOfficer(existing,b.stage);
+  if(assignedTo(d,current,m.id))return {ok:true};
+  if(current||d.assessments.some(a=>a.teacherId===b.teacherId&&a.year===b.year&&a.stage===b.stage&&a.status!=='draft'))fail('Sesi ini sudah ditetapkan atau telah dihantar. Hubungi Admin sekolah.',409);
+  const next={teacherId:b.teacherId,observerId:existing?.observerId??null,observer2Id:observationOfficer(existing,'kedua'),reviewerId:existing?.reviewerId??null};
+  next[b.stage==='pertama'?'observerId':'observer2Id']=m.id;
+  config.assignments[String(b.year)]=[...rows.filter(r=>r.teacherId!==b.teacherId),next];
+  config.revision++;
+  audit(d,m,'pdpc_claim_observation',String(b.year),existing??null,next);
+  return {ok:true};
  }
  if(b.action==='pdpc-assignments'){
   admin(m);if(!d.pdpc||d.pdpc.version!==2)fail('Tetapan Standard 4 baharu belum diaktifkan.',409);if(!Number.isInteger(b.year)||b.year<2020||b.year>2100||b.revision!==d.pdpc.revision)fail('Tetapan berubah. Muat semula dahulu.',409);
