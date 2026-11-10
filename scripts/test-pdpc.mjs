@@ -94,3 +94,17 @@ console.log('PASS three Standard 4 sessions: legacy shared observer for both rou
  assert.equal(d.pdpc.assignments['2027'][0].observerId,'mo');
  console.log('PASS assigned observer deletion with verified record protection.');
 }
+
+{
+ const release={action:'pdpc-release-observation',teacherId:'t',year:2027,stage:'pertama',revision:d.pdpc.revision};
+ denied('mr',release,403);
+ const saved=call('mo',{action:'save',assessment:{...assessment,year:2027,mutationId:'ffffffff-bbbb-cccc-1111'}}).assessment;
+ denied('mo',release,409);
+ call('mo',{action:'pdpc-delete-assessment',id:saved.id,year:saved.year,stage:saved.stage,revision:saved.revision,updatedAt:saved.updatedAt,epoch:saved.epoch});
+ call('mo',release);
+ assert.equal(d.pdpc.assignments['2027'][0].observerId,null);
+ denied('mo',release,409);
+ call('mr',{...release,action:'pdpc-claim-observation',revision:d.pdpc.revision});
+ assert.equal(d.pdpc.assignments['2027'][0].observerId,'mr');
+ console.log('PASS observation release protects existing records and frees the slot for reassignment.');
+}
