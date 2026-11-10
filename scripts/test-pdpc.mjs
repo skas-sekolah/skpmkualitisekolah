@@ -59,3 +59,38 @@ console.log('PASS three Standard 4 sessions: legacy shared observer for both rou
  assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'kedua',2027),false);
  console.log('PASS PdPc self-assignment: eligible leaders only, no self-observation or reassignment, independent rounds and year.');
 }
+
+{
+ const kendiri={...assessment,year:2028,stage:'kendiri',mutationId:'dddddddd-bbbb-cccc-1111'};
+ denied('mo',{action:'save',assessment:kendiri},403);
+ const saved=call('a',{action:'save',assessment:kendiri}).assessment;
+ assert.equal(saved.evaluator,'Guru');
+ assert.equal(saved.updatedBy,'a');
+ const remove={action:'pdpc-delete-assessment',id:saved.id,year:saved.year,stage:saved.stage,revision:saved.revision,updatedAt:saved.updatedAt,epoch:saved.epoch};
+ denied('mt',remove,403);
+ denied('a',{...remove,stage:'pertama'},409);
+ const other=d.assessments.filter(a=>a.id!==saved.id);
+ call('a',remove);
+ assert.deepEqual(d.assessments,other);
+ assert.equal(d.audit.at(-1).action,'pdpc_assessment_deleted');
+ const recreated=call('a',{action:'save',assessment:{...kendiri,mutationId:'dddddddd-bbbb-cccc-2222'}}).assessment;
+ assert.ok(recreated.revision>saved.revision);
+ denied('a',remove,409);
+ denied('a',{action:'save',assessment:{...saved,mutationId:'dddddddd-bbbb-cccc-3333'}},409);
+ console.log('PASS Admin kendiri and scoped assessment deletion, including stale versions after recreation.');
+}
+
+{
+ const observation={...assessment,year:2027,mutationId:'eeeeeeee-bbbb-cccc-1111'};
+ const saved=call('mo',{action:'save',assessment:observation}).assessment;
+ const remove={action:'pdpc-delete-assessment',id:saved.id,year:saved.year,stage:saved.stage,revision:saved.revision,updatedAt:saved.updatedAt,epoch:saved.epoch};
+ denied('mr',remove,403);
+ denied('mt',remove,403);
+ saved.status='verified';
+ denied('mo',remove,403);
+ saved.status='draft';
+ call('mo',remove);
+ assert.ok(!d.assessments.some(a=>a.id===saved.id));
+ assert.equal(d.pdpc.assignments['2027'][0].observerId,'mo');
+ console.log('PASS assigned observer deletion with verified record protection.');
+}
