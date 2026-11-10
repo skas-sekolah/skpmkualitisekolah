@@ -35,6 +35,15 @@ export default function PdpcModule({session,year,onDirty,settings=false}:{sessio
  const pages=Math.max(1,Math.ceil(filtered.length/20)),currentPage=Math.min(page,pages),visible=filtered.slice((currentPage-1)*20,currentPage*20);
  useEffect(()=>setPage(1),[query,category,statusFilter,year]);
  function openAssessment(t:Teacher,s:Stage){const r=assignment(t.id)!;setError('');setEditor({teacher:{...t,pp1:person(observationOfficer(r,s)),pp2:person(r.reviewerId)},stage:s});}
+ async function releaseObservation(t:Teacher,s:Stage){
+  if(!config||!window.confirm(`Padam pilihan ${t.name} untuk ${stageNames[s]}, tahun ${year}?`))return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   await appApi({action:'pdpc-release-observation',teacherId:t.id,stage:s,year,revision:config.revision});
+   await load();setNotice('Pilihan guru dibatalkan untuk sesi tersebut.');
+  }catch(e){setError((e as Error).message);}
+  finally{setBusy(false);}
+ }
  async function deleteAssessment(t:Teacher,a:Assessment){
   if(!config||!window.confirm(`Padam rekod ${stageNames[a.stage]} bagi ${t.name}, tahun ${a.year}? Skor dan pautan evidens dalam rekod ini akan dibuang.`))return;
   setBusy(true);setError('');setNotice('');
@@ -44,7 +53,7 @@ export default function PdpcModule({session,year,onDirty,settings=false}:{sessio
   }catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
  }
- function assessmentButton(t:Teacher,s:Stage){const a=records.find(a=>a.teacherId===t.id&&a.stage===s),write=s==='kendiri'?(session.isAdmin||t.id===session.teacherId):canObserve(t,s);return <><button className={'pdpc-open progress-'+(a?.status??'empty')} aria-label={stageNames[s]+' · '+t.name+' · '+(a?labels[a.status]:write?'Isi penilaian':'Lihat penilaian')} onClick={()=>openAssessment(t,s)}>{a?`${labels[a.status]} · ${a.total??'—'}/100`:write?'Isi penilaian':'Lihat penilaian'}</button>{a&&(session.isAdmin||(s!=='kendiri'&&a.status!=='verified'&&canObserve(t,s)))&&<button className="secondary" disabled={busy||!!a.localPending||!navigator.onLine} onClick={()=>void deleteAssessment(t,a)}>Padam rekod</button>}</>;}
+ function assessmentButton(t:Teacher,s:Stage){const a=records.find(a=>a.teacherId===t.id&&a.stage===s),write=s==='kendiri'?(session.isAdmin||t.id===session.teacherId):canObserve(t,s);return <><button className={'pdpc-open progress-'+(a?.status??'empty')} aria-label={stageNames[s]+' · '+t.name+' · '+(a?labels[a.status]:write?'Isi penilaian':'Lihat penilaian')} onClick={()=>openAssessment(t,s)}>{a?`${labels[a.status]} · ${a.total??'—'}/100`:write?'Isi penilaian':'Lihat penilaian'}</button>{a&&(session.isAdmin||(s!=='kendiri'&&a.status!=='verified'&&canObserve(t,s)))&&<button className="secondary" disabled={busy||!!a.localPending||!navigator.onLine} onClick={()=>void deleteAssessment(t,a)}>Padam rekod</button>}{!a&&s!=='kendiri'&&canObserve(t,s)&&<button className="secondary" disabled={busy||!navigator.onLine} aria-label={'Padam pilihan '+t.name+' · '+stageNames[s]} onClick={()=>void releaseObservation(t,s)}>Padam pilihan</button>}</>;}
 
  function edit(id:string,field:'observerId'|'observer2Id'|'reviewerId',value:string){setRows(prev=>prev.map(r=>r.teacherId===id?{...r,[field]:value||null}:r));setChanged(true);onDirty(true);setNotice('');}
  async function review(decision:'verify'|'return'|'reopen'){
