@@ -85,6 +85,22 @@ export function dataCommand(d:SchoolDoc,m:Row,b:Row){
   const before=structuredClone(targets);for(const row of targets){if(b.mode==='reactivate'){delete row.inactiveFromYear;delete row.inactiveReason;}else{row.inactiveFromYear=b.fromYear;row.inactiveReason=b.reason.trim();}}
   d.rosterRevision=(d.rosterRevision??0)+1;audit(d,m,'roster_'+b.mode,d.school.id,before,targets);return {updated:targets.length};
  }
+ if(b.action==='pdpc-release-observation'){
+  const config=d.pdpc;
+  if(!config||config.version!==2||config.revision!==b.revision)fail('Tetapan berubah. Muat semula dahulu.',409);
+  if(!Number.isInteger(b.year)||b.year<2020||b.year>2100||!['pertama','kedua'].includes(b.stage))fail('Tahun atau sesi pencerapan tidak sah.');
+  const teacher=d.teachers.find(t=>t.id===b.teacherId);
+  if(!teacher||!mayWrite(d,m,teacher,b.stage,b.year))fail('Sesi ini bukan penugasan anda.',403);
+  if(d.assessments.some(a=>a.teacherId===teacher.id&&a.year===b.year&&a.stage===b.stage))fail('Padam rekod penilaian sesi ini dahulu sebelum membatalkan pilihan.',409);
+  const rows=config.assignments[String(b.year)]??[];
+  const row=rows.find(r=>r.teacherId===teacher.id)!;
+  const next={...row,observer2Id:observationOfficer(row,'kedua')};
+  next[b.stage==='pertama'?'observerId':'observer2Id']=null;
+  config.assignments[String(b.year)]=rows.map(r=>r===row?next:r);
+  config.revision++;
+  audit(d,m,'pdpc_release_observation',String(b.year),row,next);
+  return {ok:true};
+ }
  if(b.action==='pdpc-claim-observation'){
   if(!Number.isInteger(b.year)||b.year<2020||b.year>2100||!['pertama','kedua'].includes(b.stage))fail('Tahun atau sesi pencerapan tidak sah.');
   const config=d.pdpc;
