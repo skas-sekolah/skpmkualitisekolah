@@ -40,7 +40,7 @@ call(d,'reviewer',{action:'reopen',revision:7,feedback:'Buka untuk kemas kini in
 assert.equal(current(d,'A4',2025).revision,0);assert.equal(current(d,'A5').revision,0);
 assert.deepEqual(d.assessments,[{id:'original-mark',total:91}]);assert.deepEqual(d.teachers,fixture().teachers);
 // An admin who edits cannot verify their own work, even with admin privileges.
-call(d,'writer',{action:'save',revision:8,data,mutationId:'dddddddd-1111-2222'});call(d,'writer',{action:'submit',revision:9});denied(d,'admin',{action:'verify',revision:10},403);call(d,'reviewer',{action:'verify',revision:10});
+call(d,'admin',{action:'save',revision:8,data,mutationId:'dddddddd-1111-2222'});call(d,'admin',{action:'submit',revision:9});denied(d,'admin',{action:'verify',revision:10},403);call(d,'reviewer',{action:'verify',revision:10});
 // Revoked membership / assignments take effect on the next server check.
 member(d,'writer').active=0;const view=S.strengthView(d,member(d,'writer'),2026);assert.equal(view.records.find(r=>r.aspect==='A4').canRead,false);
 denied(d,'writer',{action:'save',revision:11,data,mutationId:'eeeeeeee-1111-2222'},403);
@@ -71,3 +71,30 @@ console.log('PASS: nine aspects, atomic authorization, tenant-safe assignments, 
 }
 
 assert.ok(M.strengthIssues('A8',{...na,evidence:[]}).some(s=>s.includes('evidens')),'Not-applicable still requires evidence');
+
+// Active school Admin can enter unassigned aspects without a teacher link.
+{
+ const doc=fixture();
+ assert.ok(S.strengthView(doc,member(doc,'admin'),2026).records.every(r=>r.canEdit));
+ const marks={...M.emptyStrengthData(),values:{previousStandard4:80},notes:'Semakan sumber',evidence:['https://example.test/source']};
+ const command=b=>call(doc,'admin',{aspect:'A2',...b});
+ command({action:'save',revision:0,data:{...marks,evidence:[]},mutationId:'aaaaaaaa-bbbb-0001'});
+ denied(doc,'admin',{aspect:'A2',action:'submit',revision:1},400);
+ command({action:'save',revision:1,data:marks,mutationId:'aaaaaaaa-bbbb-0002'});
+ assert.equal(current(doc,'A2').assigneeId,null);
+ command({action:'submit',revision:2});
+ denied(doc,'admin',{aspect:'A2',action:'save',revision:3,data:marks,mutationId:'aaaaaaaa-bbbb-0003'},409);
+ denied(doc,'admin',{aspect:'A2',action:'verify',revision:3},403);
+ call(doc,'reviewer',{aspect:'A2',action:'verify',revision:3});
+ denied(doc,'admin',{aspect:'A2',action:'save',revision:4,data:marks,mutationId:'aaaaaaaa-bbbb-0003'},409);
+ call(doc,'reviewer',{aspect:'A2',action:'reopen',revision:4,feedback:'Kemas kini sumber.'});
+ command({action:'save',revision:5,data:marks,mutationId:'aaaaaaaa-bbbb-0003'});
+ assert.equal(current(doc,'A2').lastEditorId,'admin');
+ assert.deepEqual(doc.teachers,fixture().teachers);
+ assert.deepEqual(doc.members,fixture().members);
+ member(doc,'admin').active=0;
+ denied(doc,'admin',{aspect:'A2',action:'save',revision:6,data:marks,mutationId:'aaaaaaaa-bbbb-0004'},403);
+ const foreign={id:'foreign-admin',role:'admin',active:1};
+ assert.throws(()=>S.strengthCommand(doc,foreign,{year:2026,aspect:'A2',action:'save',revision:6,data:marks,mutationId:'foreign-admin-0001'}),e=>e.status===403);
+ console.log('PASS Admin entry: unlinked account, all aspects, evidence required, independent PGB review, locked records, audit identity and membership revocation.');
+}
