@@ -6,7 +6,7 @@ const scoring=compile(fs.readFileSync('migration/backend/scoring.ts','utf8').rep
 const domain=compile(fs.readFileSync('migration/backend/domain.ts','utf8').replace("'./scoring.ts'",JSON.stringify(scoring)));
 const model=compile(fs.readFileSync('migration/backend/strength-model.ts','utf8'));
 const M=await import(model),S=await import(compile(fs.readFileSync('migration/backend/strength-api.ts','utf8').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./strength-model.ts'",JSON.stringify(model))));
-const fixture=()=>({school:{id:'school-a',code:'TEST-A',name:'Sekolah Contoh'},teachers:[{id:'original-teacher',name:'Fixture leader',position:'PK'},{id:'review-teacher',name:'Fixture reviewer',position:'PK KOKU'},{id:'other-teacher',name:'Fixture other leader',position:'PK HEM'}],assessments:[{id:'original-mark',total:91}],members:[{id:'admin',active:1,role:'admin',displayName:'Pentadbir'},{id:'writer',teacherId:'original-teacher',active:1,role:'member',displayName:'Pengisi'},{id:'reviewer',teacherId:'review-teacher',active:1,role:'member',displayName:'Penyemak'},{id:'other',teacherId:'other-teacher',active:1,role:'member',displayName:'Pengguna lain'},{id:'inactive',active:0,role:'member'}],audit:[],sessions:[],invitations:[],imports:[]});
+const fixture=()=>({school:{id:'school-a',code:'TEST-A',name:'Sekolah Contoh'},teachers:[{id:'original-teacher',name:'Fixture leader',position:'PK'},{id:'review-teacher',name:'Fixture reviewer',position:'GURU BESAR'},{id:'other-teacher',name:'Fixture other leader',position:'PK HEM'}],assessments:[{id:'original-mark',total:91}],members:[{id:'admin',active:1,role:'admin',displayName:'Pentadbir'},{id:'writer',teacherId:'original-teacher',active:1,role:'member',displayName:'Pengisi'},{id:'reviewer',teacherId:'review-teacher',active:1,role:'member',displayName:'Penyemak'},{id:'other',teacherId:'other-teacher',active:1,role:'member',displayName:'Pengguna lain'},{id:'inactive',active:0,role:'member'}],audit:[],sessions:[],invitations:[],imports:[]});
 const member=(d,id)=>d.members.find(m=>m.id===id);
 const call=(d,id,body)=>S.strengthCommand(d,member(d,id),{year:2026,aspect:'A4',...body});
 const current=(d,aspect='A4',year=2026)=>S.strengthView(d,member(d,'admin'),year).records.find(r=>r.aspect===aspect);
@@ -19,7 +19,7 @@ denied(d,'writer',{action:'assign',revision:0,assigneeId:'writer',reviewerId:'re
 denied(d,'admin',{action:'assign',revision:0,assigneeId:'writer',reviewerId:'writer'},400);
 denied(d,'admin',{action:'assign',revision:0,assigneeId:'foreign-school-member',reviewerId:'reviewer'},400);
 denied(d,'admin',{action:'assign',revision:0,assigneeId:'writer',reviewerId:'inactive'},400);
-call(d,'admin',{action:'assign',revision:0,assigneeId:'writer',reviewerId:'reviewer'});
+call(d,'admin',{action:'assign',revision:0,assigneeId:'writer',reviewerId:null});
 const data=M.emptyStrengthData();data.rows=[{id:'inventory-1',name:M.CATALOG.A4[0],existing:10,working:8}];data.notes='Semakan inventori sekolah';data.evidence=['https://example.test/inventory'];
 denied(d,'other',{action:'save',revision:1,data,mutationId:'aaaaaaaa-1111-2222'},403);
 denied(d,'writer',{action:'save',revision:0,data,mutationId:'aaaaaaaa-1111-2222'},409);

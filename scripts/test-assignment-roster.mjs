@@ -3,7 +3,7 @@ import {domain,compile,read,scoring,A,R,fixture,complete} from './achievement-fi
 const D=await import(domain),sm=compile(read('migration/backend/strength-model.ts')),mm=compile(read('migration/backend/management-model.ts'));
 const S=await import(compile(read('migration/backend/strength-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./strength-model.ts'",JSON.stringify(sm))));
 const M=await import(compile(read('migration/backend/management-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./management-model.ts'",JSON.stringify(mm)).replace("'./scoring.ts'",JSON.stringify(scoring))));
-const d=fixture();d.teachers=[{id:'leader',name:'Fixture Leader',position:'PK HEM'},{id:'ordinary',name:'Fixture Teacher',position:'GAB'},{id:'review',name:'Fixture Reviewer',position:'PK KOKU'},{id:'pending',name:'Fixture Pending',position:'GAB'}];
+const d=fixture();d.teachers=[{id:'leader',name:'Fixture Leader',position:'PK HEM'},{id:'ordinary',name:'Fixture Teacher',position:'GAB'},{id:'review',name:'Fixture Reviewer',position:'GURU BESAR'},{id:'pending',name:'Fixture Pending',position:'GAB'}];
 const who=id=>d.members.find(m=>m.id===id);who('writer').teacherId='leader';who('second').teacherId='ordinary';who('reviewer').teacherId='review';who('other').displayName='Fixture Pending';
 const originalTeachers=structuredClone(d.teachers),originalMarks=structuredClone(d.assessments),people=D.assignmentPeople(d),teachers=people.filter(p=>p.kind==='teacher');
 assert.equal(teachers.length,4);assert.equal(teachers.filter(p=>p.schoolLeader).length,2);assert.equal(teachers.find(p=>p.id==='teacher:pending').linked,false);
