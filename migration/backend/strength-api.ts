@@ -1,7 +1,7 @@
 import {scoreEntry,admin,audit,fail,now,assignmentPeople,assignmentIdentity,isPGB,eligibleReviewAssignee,assignedMember,assignedTo,eligibleStrengthAssignee,type Row,type SchoolDoc} from './domain.ts';
 import {ASPECTS,emptyStrengthRecord,cleanStrengthData,strengthIssues,validAspect,validYear,type StrengthRecord,type StrengthBundle,type AspectId} from './strength-model.ts';
 type Store=SchoolDoc&{strength?:Record<string,Partial<Record<AspectId,StrengthRecord>>>};
-function permissions(d:SchoolDoc,m:Row,r:StrengthRecord){const canAdmin=m.role==='admin',writer=eligibleStrengthAssignee(d,r.assigneeId,r.year)&&assignedTo(d,r.assigneeId,m.id),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:writer,canEdit:writer&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
+function permissions(d:SchoolDoc,m:Row,r:StrengthRecord){const canAdmin=m.role==='admin'&&d.members.some(x=>x.id===m.id&&x.active===1&&x.role==='admin'),writer=eligibleStrengthAssignee(d,r.assigneeId,r.year)&&assignedTo(d,r.assigneeId,m.id),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:canAdmin||writer,canEdit:(canAdmin||writer)&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
 function record(d:Store,aspect:AspectId,year:number):StrengthRecord{return structuredClone(d.strength?.[String(year)]?.[aspect]??emptyStrengthRecord(aspect,year));}
 export function strengthView(d:SchoolDoc,m:Row,year:number):StrengthBundle{
  if(!validYear(year))fail('Pilih tahun antara 2020–2100.');
@@ -16,7 +16,7 @@ export function strengthCommand(d:SchoolDoc,m:Row,b:Row):StrengthBundle{
  }
  if(!validYear(b.year))fail('Pilih tahun antara 2020–2100.');if(!validAspect(b.aspect))fail('Aspek tidak sah.');
  const store=d as Store,year=b.year,aspect=b.aspect as AspectId,r=record(store,aspect,year),before=structuredClone(r),p=permissions(d,m,r);
- if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya pengisi / PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||assignedTo(d,r.assigneeId,m.id)||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
+ if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya Admin atau pengisi / PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||assignedTo(d,r.assigneeId,m.id)||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
  if(b.action==='save'&&typeof b.mutationId==='string'&&r.lastMutationId===b.mutationId&&r.lastMutationActor===m.id)return strengthView(d,m,year);
  if(!Number.isInteger(b.revision)||b.revision!==r.revision)fail('Rekod telah berubah. Muat semula dan semak perubahan sebelum menyimpan.',409,{record:{...r,...p}});
  if(b.action==='assign'){
@@ -32,7 +32,7 @@ export function strengthCommand(d:SchoolDoc,m:Row,b:Row):StrengthBundle{
   r.status='draft';r.feedback='';r.lastMutationId=b.mutationId;r.lastMutationActor=m.id;(r as unknown as Row).lastEditorId=m.id;
  }else if(b.action==='submit'){
   if(!p.canEdit)fail('Borang tidak berada dalam status draf.',409);
-  if(!r.assigneeId||!assignedMember(d,r.assigneeId))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
+  if(!p.canAdmin&&(!r.assigneeId||!assignedMember(d,r.assigneeId)))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
   const issues=strengthIssues(aspect,r.data);if(issues.length)fail(issues[0],400,{issues});
   r.status='submitted';r.submittedAt=now();r.feedback='';r.verifiedAt=null;r.verifiedBy=null;r.verifiedName=null;
  }else if(b.action==='verify'){
