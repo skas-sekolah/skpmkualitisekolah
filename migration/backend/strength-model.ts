@@ -73,11 +73,18 @@ export type StrengthMetric={label:string;value:number|null;unit:string;note?:str
 export const ratio=(n:number|null|undefined,d:number|null|undefined)=>n==null||d==null||d===0?null:Math.round(n/d*10000)/100;
 export const parentBand=(n:number|null|undefined)=>n==null?null:n<=0?0:n<=3?25:n<=6?50:n<=9?75:100;
 export const communityBand=(n:number|null|undefined)=>n==null?null:n<=0?0:n<=1?25:n<=3?50:n<=5?75:100;
+// Aspek 3: each of the three criteria carries a maximum of 3%.
+export const A3_CRITERIA=[
+ {title:'Bilangan AKP yang mencukupi mengikut perjawatan ABM.',keys:['akp','akpABM'],numerator:'akp',denominator:'akpABM'},
+ {title:'Bilangan AKP berpengalaman (3 tahun dan ke atas).',keys:['experiencedAKP'],numerator:'experiencedAKP',denominator:'akp'},
+ {title:'Bilangan pekerja swasta yang mencukupi untuk melaksanakan tugas pembersihan dan kawalan keselamatan sekolah, dan bekalan makanan asrama.',keys:['privateWorkers','eligibleWorkers'],numerator:'privateWorkers',denominator:'eligibleWorkers'}
+] as const;
+export function a3Scores(d:StrengthData){return A3_CRITERIA.map(c=>{const n=d.values[c.numerator],den=d.values[c.denominator];return n==null||den==null||den===0?null:Math.round(Math.min(1,n/den)*300)/100;});}
 export function strengthMetrics(aspect:AspectId,d:StrengthData):StrengthMetric[]{
  if(!d.applicable)return [{label:'Asrama',value:null,unit:'',note:'Tidak berkenaan — '+d.notes}];const v=d.values;const metric=(label:string,value:number|null,note?:string):StrengthMetric=>({label,value,unit:'%',note});
  if(aspect==='A1')return [metric('Kecukupan guru mengikut ABM',ratio(v.teachers,v.teacherABM)),metric('Guru memenuhi keperluan opsyen',ratio(v.optionTeachers,v.teacherABM)),metric('Guru dengan kepakaran diiktiraf',ratio(v.expertTeachers,v.teachers)),metric('Guru berpengalaman memegang jawatan strategik',ratio(v.strategicTeachers,v.experiencedTeachers))];
  if(aspect==='A2')return [metric('Rumusan Standard 4 tahun sebelumnya',v.previousStandard4??null)];
- if(aspect==='A3')return [metric('Kecukupan AKP mengikut ABM',ratio(v.akp,v.akpABM)),metric('AKP berpengalaman',ratio(v.experiencedAKP,v.akp)),metric('Kecukupan pekerja swasta',ratio(v.privateWorkers,v.eligibleWorkers))];
+ if(aspect==='A3'){const scores=a3Scores(d);return [...A3_CRITERIA.flatMap((c,i)=>[metric(['Kecukupan AKP mengikut ABM','AKP berpengalaman','Kecukupan pekerja swasta'][i],ratio(v[c.numerator],v[c.denominator])),metric('Skor kriteria '+(i+1),scores[i],'Maksimum 3%. Bilangan ÷ rujukan × 3%; dihadkan kepada 3%.')]),metric('Jumlah skor Aspek 3',scores.every(x=>x!==null)?Math.round(scores.reduce<number>((s,x)=>s+(x??0),0)*100)/100:null,'Maksimum 9%. Jumlah dipaparkan selepas ketiga-tiga kriteria lengkap dan mempunyai pembahagi melebihi sifar.')];}
  const out:StrengthMetric[]=[];
  if(aspect==='A7')out.push(metric('Pengguna aktif DELIMa tahun sebelumnya',v.delima??null));
  if(HAS_INVENTORY.includes(aspect)){const complete=d.none||d.rows.length>0&&d.rows.every(r=>r.name&&r.existing!==null&&r.working!==null);const existing=complete?d.rows.reduce((s,r)=>s+(r.existing??0),0):null,working=complete?d.rows.reduce((s,r)=>s+(r.working??0),0):null;out.push({label:'Jumlah sedia ada',value:existing,unit:'unit'},{label:'Jumlah berfungsi',value:working,unit:'unit'},metric('Prasarana / peranti berfungsi',ratio(working,existing),'Peratus berfungsi daripada jumlah sedia ada. Jumlah sifar tidak menghasilkan peratus.'));}
