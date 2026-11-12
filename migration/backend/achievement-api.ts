@@ -3,7 +3,7 @@ import {ACHIEVEMENT_ITEMS,emptyAchievementRecord,cleanAchievementData,achievemen
 import type {AchievementPSS} from './resources-model.ts';
 export type AchievementStore=SchoolDoc&{achievement?:Record<string,Record<string,AchievementRecord>>;resources?:{pss?:Record<string,{revision:number;rows:AchievementPSS[]}>}};
 function record(d:SchoolDoc,aspect:string,year:number){const store=d as AchievementStore,r=structuredClone(store.achievement?.[String(year)]?.[aspect]??emptyAchievementRecord(aspect,year));r.pssIds=effectiveAchievementPSS(store.resources?.pss?.[String(year)]?.rows??[],aspect);r.assigneeId=r.pssIds[0]??null;return r;}
-function permissions(d:SchoolDoc,m:Row,r:AchievementRecord){const canAdmin=m.role==='admin',writer=[r.assigneeId,...(r.pssIds??[])].some(id=>eligiblePPSAssignee(d,id,r.year)&&assignedTo(d,id,m.id)),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:writer,canEdit:writer&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
+function permissions(d:SchoolDoc,m:Row,r:AchievementRecord){const canAdmin=m.role==='admin',writer=[r.assigneeId,...(r.pssIds??[])].some(id=>eligiblePPSAssignee(d,id,r.year)&&assignedTo(d,id,m.id)),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:canAdmin||writer,canEdit:(canAdmin||writer)&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
 export function achievementView(d:SchoolDoc,m:Row,year:number):AchievementBundle{
  if(!d.members.some(x=>x.id===m.id&&x.active===1))fail('Akses akaun tidak aktif.',403);if(!validAchievementYear(year))fail('Tahun tidak sah.');
  return {year,records:ACHIEVEMENT_ITEMS.map(a=>{const r=record(d,a.id,year),p=permissions(d,m,r),hasEntry=scoreEntry(r.data);if(!p.canRead){r.data=emptyAchievementRecord(a.id,year).data;r.feedback='';r.verifiedName=null;r.lastEditorId=null;}delete r.lastMutationId;delete r.lastMutationActor;return {...r,...p,hasEntry};}),people:assignmentPeople(d,year),school:{code:d.school.code,name:d.school.name},sessionId:m.id};
@@ -13,7 +13,7 @@ export function achievementCommand(d:SchoolDoc,m:Row,b:Row):AchievementBundle{
  if(!validAchievementYear(b.year))fail('Pilih tahun antara 2020–2100.');
  if(!validAchievement(b.aspect))fail('Aspek tidak sah.');
  const store=d as AchievementStore,year=b.year,aspect=b.aspect as string,r=record(store,aspect,year),before=structuredClone(r),p=permissions(d,m,r);
- if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya pengisi / PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||[r.assigneeId,...(r.pssIds??[])].some(id=>assignedTo(d,id,m.id))||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
+ if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya Admin atau PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||[r.assigneeId,...(r.pssIds??[])].some(id=>assignedTo(d,id,m.id))||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
  if(b.action==='save'&&typeof b.mutationId==='string'&&r.lastMutationId===b.mutationId&&r.lastMutationActor===m.id)return achievementView(d,m,year);
  if(!Number.isInteger(b.revision)||b.revision!==r.revision)fail('Rekod telah berubah. Muat semula dan semak perubahan sebelum menyimpan.',409,{record:{...r,...p}});
  if(b.action==='assign'){
@@ -30,7 +30,7 @@ export function achievementCommand(d:SchoolDoc,m:Row,b:Row):AchievementBundle{
   r.status='draft';r.feedback='';r.lastMutationId=b.mutationId;r.lastMutationActor=m.id;(r as unknown as Row).lastEditorId=m.id;
  }else if(b.action==='submit'){
   if(!p.canEdit)fail('Borang tidak berada dalam status draf.',409);
-  if(!r.assigneeId||!assignedMember(d,r.assigneeId))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
+  if(!p.canAdmin&&(!r.assigneeId||!assignedMember(d,r.assigneeId)))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
   let clean;try{clean=cleanAchievementData(aspect,r.data);}catch(e){fail((e as Error).message);}const issues=achievementIssues(aspect,clean!);if(issues.length)fail(issues[0],400,{issues});
   r.status='submitted';r.submittedAt=now();r.feedback='';r.verifiedAt=null;r.verifiedBy=null;r.verifiedName=null;
  }else if(b.action==='verify'){
