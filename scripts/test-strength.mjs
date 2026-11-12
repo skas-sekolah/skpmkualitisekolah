@@ -98,3 +98,15 @@ assert.ok(M.strengthIssues('A8',{...na,evidence:[]}).some(s=>s.includes('evidens
  assert.throws(()=>S.strengthCommand(doc,foreign,{year:2026,aspect:'A2',action:'save',revision:6,data:marks,mutationId:'foreign-admin-0001'}),e=>e.status===403);
  console.log('PASS Admin entry: unlinked account, all aspects, evidence required, independent PGB review, locked records, audit identity and membership revocation.');
 }
+
+// Reference Aspek 3: weighted scores use raw ratios, never rounded percentages.
+{
+ const sample={...M.emptyStrengthData(),values:{akp:12,akpABM:16,experiencedAKP:8,privateWorkers:10,eligibleWorkers:10}};
+ assert.deepEqual(M.a3Scores(sample),[2.25,2,3]);
+ assert.equal(M.strengthMetrics('A3',sample).at(-1).value,7.25);
+ assert.deepEqual(M.a3Scores({...sample,values:{...sample.values,akp:0,experiencedAKP:0}}),[0,null,3]);
+ assert.equal(M.strengthMetrics('A3',M.emptyStrengthData()).at(-1).value,null);
+ assert.deepEqual(M.a3Scores({...sample,values:{...sample.values,privateWorkers:20}}),[2.25,2,3]);
+ assert.deepEqual(M.a3Scores({...sample,values:{...sample.values,eligibleWorkers:0}}),[2.25,2,null]);
+ console.log('PASS Aspek 3 weighted reference, maximum scores, blank/zero denominators and partial totals.');
+}
