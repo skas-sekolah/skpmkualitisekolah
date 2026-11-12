@@ -1,5 +1,5 @@
 import {resourcesApi} from './app-client';
-import {evidenceFolder,googleConnectionReady,type DriveSettings,type EvidenceModule} from '../migration/backend/resources-model';
+import {evidenceFolder,googleConnectionReady,scriptConnectionReady,type DriveSettings,type EvidenceModule} from '../migration/backend/resources-model';
 export type {EvidenceModule};
 const g=()=>window as unknown as {google:any;gapi:any};
 const loaders=new Map<string,Promise<void>>();
@@ -26,3 +26,10 @@ export async function uploadDriveEvidence(file:File,context:{module:EvidenceModu
  const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body,signal:AbortSignal.timeout(120000)});if(!r.ok)throw Error('Fail belum dimuat naik ('+r.status+'). Semak akses folder dan cuba semula.');const saved=await r.json();return {name:saved.name as string,url:(saved.webViewLink||'https://drive.google.com/file/d/'+saved.id+'/view') as string};
 }
 export async function prepareDrive(settings:DriveSettings,module:EvidenceModule){const folder=evidenceFolder(settings,module);if(!folder)throw Error('Admin belum menetapkan folder evidens modul ini.');if(!googleConnectionReady(settings))throw Error('Muat naik terus belum disambungkan. Buka folder Google Drive, muat naik fail di sana dan tambah pautan fail sebagai evidens.');const token=await driveToken(settings),picked=await chooseDriveFolder(settings,token),expected=folder.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1];if(picked.id!==expected)throw Error('Pilih folder sekolah yang sama dengan tetapan pentadbir.');return token;}
+
+export async function uploadScriptEvidence(file:File,context:{module:EvidenceModule;aspect:string;actionId?:string;year:number;stage?:string;epoch?:string}){
+ if(file.size>5*1024*1024)throw Error('Maksimum 5 MB bagi setiap fail melalui Apps Script.');
+ const {upload}=await resourcesAPI({action:'reserve-upload',...context,extension:file.name.split('.').pop()?.toLowerCase(),size:file.size});
+ const base64=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Fail tidak dapat dibaca.'));reader.readAsDataURL(file);});
+ return resourcesAPI<{name:string;url:string}>({action:'script-upload',year:context.year,uploadId:upload.id,base64});
+}

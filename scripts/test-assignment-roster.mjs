@@ -20,8 +20,8 @@ denied(M.managementCommand,'admin',{action:'assign',aspect:'1.1.1',revision:0,as
 invoke(M.managementCommand,'admin',{action:'assign',aspect:'1.1.1',revision:0,assigneeId:'teacher:pending',pssIds:['teacher:pending','teacher:ordinary'],reviewerId:'reviewer'});
 assert.equal(M.managementView(d,who('second'),2026).records[0].canEdit,true);assert.equal(M.managementView(d,who('other'),2026).records[0].canRead,false,'Display-name impersonation does not authorize access');
 invoke(A.achievementCommand,'admin',{action:'assign',aspect:'5.3.1',revision:0,assigneeId:'teacher:pending',pssIds:['teacher:pending'],reviewerId:'reviewer'});
-denied(A.achievementCommand,'admin',{action:'save',aspect:'5.3.1',revision:1,data:complete('5.3.1'),mutationId:crypto.randomUUID()},403);Object.assign(d.achievement[2026]['5.3.1'],{data:complete('5.3.1'),revision:2});
-denied(A.achievementCommand,'admin',{action:'submit',aspect:'5.3.1',revision:2},403);
+invoke(A.achievementCommand,'admin',{action:'save',aspect:'5.3.1',revision:1,data:complete('5.3.1'),mutationId:crypto.randomUUID()});Object.assign(d.achievement[2026]['5.3.1'],{data:complete('5.3.1'),revision:2});
+const adminCopy=structuredClone(d);A.achievementCommand(adminCopy,who('admin'),{action:'submit',year:2026,aspect:'5.3.1',revision:2});assert.equal(adminCopy.achievement[2026]['5.3.1'].status,'submitted');
 d.members.push({id:'new-linked',teacherId:'pending',displayName:'Fixture Pending',role:'member',active:1});
 assert.equal(A.achievementView(d,who('new-linked'),2026).records.find(r=>r.aspect==='5.3.1').canEdit,true,'Current teacher ID link enables the planned task');
 assert.equal(A.achievementView(d,who('other'),2026).records.find(r=>r.aspect==='5.3.1').canRead,false);

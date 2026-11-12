@@ -2,7 +2,7 @@ import {calculate,rosterActive,stages,type TeacherType} from './scoring.ts';
 import {scoreEntry,isPGB,admin,audit,fail,now,assignmentPeople,eligibleReviewAssignee,assignmentIdentity,assignedMember,assignedTo,eligiblePPSAssignee,type Row,type SchoolDoc} from './domain.ts';
 import {MANAGEMENT_UNITS,emptyManagementRecord,cleanManagementData,managementIssues,validManagementUnit,validYear,defaultReportNotes,cleanReportNotes,mean,type ReportNotes,type SchoolReport,type PdpcSummary,type ManagementRecord,type ManagementBundle,type ManagementUnitId} from './management-model.ts';
 type Store=SchoolDoc&{management?:Record<string,Partial<Record<ManagementUnitId,ManagementRecord>>>;managementReports?:Record<string,ReportNotes>};
-function permissions(d:SchoolDoc,m:Row,r:ManagementRecord){const canAdmin=m.role==='admin',writer=[r.assigneeId,...(r.pssIds??[])].some(id=>eligiblePPSAssignee(d,id,r.year)&&assignedTo(d,id,m.id)),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:writer,canEdit:writer&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
+function permissions(d:SchoolDoc,m:Row,r:ManagementRecord){const canAdmin=m.role==='admin',writer=[r.assigneeId,...(r.pssIds??[])].some(id=>eligiblePPSAssignee(d,id,r.year)&&assignedTo(d,id,m.id)),reviewer=isPGB(d,m);return {canAdmin,canRead:canAdmin||writer||reviewer,canWrite:canAdmin||writer,canEdit:(canAdmin||writer)&&['draft','returned'].includes(r.status),canReopen:reviewer&&!writer&&(r as unknown as Row).lastEditorId!==m.id&&['submitted','verified'].includes(r.status),canReview:reviewer&&r.status==='submitted'&&!writer&&(r as unknown as Row).lastEditorId!==m.id};}
 function record(d:Store,aspect:ManagementUnitId,year:number):ManagementRecord{return structuredClone(d.management?.[String(year)]?.[aspect]??emptyManagementRecord(aspect,year));}
 export function scoringReport(d:SchoolDoc,year:number):SchoolReport{
  const teachers=new Map(d.teachers.filter(t=>rosterActive(t,year)||d.assessments.some(a=>a.teacherId===t.id&&a.year===year)).map(t=>[t.id,t]));
@@ -48,7 +48,7 @@ export function managementCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
  }
  if(!validManagementUnit(b.aspect))fail('Aspek tidak sah.');
  const store=d as Store,year=b.year,aspect=b.aspect as ManagementUnitId,r=record(store,aspect,year),before=structuredClone(r),p=permissions(d,m,r);
- if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya pengisi / PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||[r.assigneeId,...(r.pssIds??[])].some(id=>assignedTo(d,id,m.id))||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
+ if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya Admin atau PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||[r.assigneeId,...(r.pssIds??[])].some(id=>assignedTo(d,id,m.id))||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
  if(b.action==='save'&&typeof b.mutationId==='string'&&r.lastMutationId===b.mutationId&&r.lastMutationActor===m.id)return managementView(d,m,year);
  if(!Number.isInteger(b.revision)||b.revision!==r.revision)fail('Rekod telah berubah. Muat semula dan semak perubahan sebelum menyimpan.',409,{record:{...r,...p}});
  if(b.action==='assign'){
@@ -64,7 +64,7 @@ export function managementCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
   r.status='draft';r.feedback='';r.lastMutationId=b.mutationId;r.lastMutationActor=m.id;(r as unknown as Row).lastEditorId=m.id;
  }else if(b.action==='submit'){
   if(!p.canEdit)fail('Borang tidak berada dalam status draf.',409);
-  if(!r.assigneeId||!assignedMember(d,r.assigneeId))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
+  if(!p.canAdmin&&(!r.assigneeId||!assignedMember(d,r.assigneeId)))fail('Admin perlu menetapkan pegawai penilai yang dipautkan kepada akaun aktif dahulu.');
   const issues=managementIssues(aspect,r.data);if(issues.length)fail(issues[0],400,{issues});
   r.status='submitted';r.submittedAt=now();r.feedback='';r.verifiedAt=null;r.verifiedBy=null;r.verifiedName=null;
  }else if(b.action==='verify'){

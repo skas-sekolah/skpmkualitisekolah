@@ -23,12 +23,12 @@ for(const [module,aspect,command,view,data] of [
  const doc=setup(),ad=doc.members[0],writer=doc.members.find(m=>m.teacherId==='leader1'),reviewer=doc.members.find(m=>m.teacherId==='leader0');
  const assign={action:'assign',aspect,year:2026,revision:0,assigneeId:'teacher:leader1',pssIds:['teacher:leader1'],reviewerId:'teacher:leader0'};
  const untouched=structuredClone(doc);assert.throws(()=>command(doc,ad,{...assign,reviewerId:'pyd'}),e=>e.status===400);assert.deepEqual(doc,untouched);assert.throws(()=>command(doc,ad,{...assign,reviewerId:'teacher:leader1'}),e=>e.status===400);
- command(doc,ad,assign);assert.equal(view(doc,ad,2026).records.find(r=>r.aspect===aspect).canRead,true);assert.equal(view(doc,ad,2026).records.find(r=>r.aspect===aspect).canEdit,module==='strength');
- if(module!=='strength')assert.throws(()=>command(doc,ad,{action:'save',aspect,year:2026,revision:1,data,mutationId:crypto.randomUUID()}),e=>e.status===403);
+ command(doc,ad,assign);assert.equal(view(doc,ad,2026).records.find(r=>r.aspect===aspect).canRead,true);assert.equal(view(doc,ad,2026).records.find(r=>r.aspect===aspect).canEdit,true);
+ const adminCopy=structuredClone(doc);command(adminCopy,ad,{action:'save',aspect,year:2026,revision:1,data,mutationId:crypto.randomUUID()});assert.equal(view(adminCopy,ad,2026).records.find(r=>r.aspect===aspect).canEdit,true);
  command(doc,writer,{action:'save',aspect,year:2026,revision:1,data,mutationId:crypto.randomUUID()});command(doc,writer,{action:'submit',aspect,year:2026,revision:2});
  assert.throws(()=>command(doc,ad,{action:'verify',aspect,year:2026,revision:3}),e=>e.status===403);command(doc,reviewer,{action:'verify',aspect,year:2026,revision:3});assert.equal(view(doc,reviewer,2026).records.find(r=>r.aspect===aspect).canReopen,true);
  doc.teachers.find(t=>t.id==='leader0').position='GAB';assert.equal(view(doc,reviewer,2026).records.find(r=>r.aspect===aspect).canReopen,false);assert.throws(()=>command(doc,reviewer,{action:'reopen',aspect,year:2026,revision:4,feedback:'Semak semula'}),e=>e.status===403);
  // Legacy member IDs remain authorized only when linked to a school leader.
  doc.teachers.find(t=>t.id==='leader0').position='GURU BESAR';assert.equal(D.eligibleReviewAssignee(doc,reviewer.id,2026),true);doc.teachers.find(t=>t.id==='leader0').inactiveFromYear=2026;assert.equal(D.eligibleReviewAssignee(doc,reviewer.id,2026),false);
 }
-console.log('PASS Admin/pentadbir: six leadership positions, separate observers, same observer/reviewer permitted for other teachers, own-record rejection, legacy assignments, role-bound marks, Admin strength entry with other modules assignment-bound, leadership-only review across three modules, alias identity and immediate demotion/inactive revocation. Fictional data only.');
+console.log('PASS Admin/pentadbir: six leadership positions, separate observers, same observer/reviewer permitted for other teachers, own-record rejection, legacy assignments, role-bound marks, Admin entry across all three modules, leadership-only review across three modules, alias identity and immediate demotion/inactive revocation. Fictional data only.');

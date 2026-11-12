@@ -31,6 +31,8 @@ jobs:
       - run: node scripts/test-management-offline.mjs
       - run: node scripts/test-resources.mjs
       - run: node scripts/test-drive-evidence.mjs
+      - run: node scripts/test-apps-script.mjs
+      - run: node scripts/test-score-template-print.mjs
       - run: node scripts/test-achievement.mjs
       - run: node scripts/test-achievement-offline.mjs
       - run: node scripts/test-pps.mjs
