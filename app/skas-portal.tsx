@@ -239,3 +239,4 @@ const portalRefinements=`/* Compact portal layout and consistent workflow colour
 .skas-editor .skas-guide-toggle p{font-size:16px!important;font-weight:400;line-height:1.6;margin:0 0 8px;padding:10px 12px;background:#edf3fc;border-left:2px solid #2d5fba;color:#25445e;overflow-wrap:anywhere}
 .skas-editor .skas-inventory-table th .skas-guide-toggle{max-width:320px;min-width:0}
 `;
+
