@@ -30,7 +30,7 @@ export async function scriptUpload(d:SchoolDoc,m:Row,b:Row,transport:typeof fetc
  if(ticket.completed)return {name:ticket.name,url:ticket.url};
  if(ticket.root!==folderId(evidenceFolder(settings,ticket.module)))fail('Folder sekolah berubah. Pilih fail semula.',409);
  // Re-run permission checks against the latest document, without changing counters or assignments.
- resourcesCommand(structuredClone(d),m,{action:'reserve-upload',year:b.year,module:ticket.module,aspect:ticket.aspect,actionId:ticket.action,stage:ticket.stage,epoch:ticket.epoch,extension:ticket.name.split('.').pop(),size:ticket.size});
+ resourcesCommand(structuredClone(d),m,{action:'reserve-upload',year:b.year,module:ticket.module,aspect:ticket.aspect,actionId:ticket.action,unitId:ticket.unitId,stage:ticket.stage,epoch:ticket.epoch,extension:ticket.name.split('.').pop(),size:ticket.size});
  if(ticket.size>SCRIPT_MAX_BYTES)fail('Apps Script menyokong fail sehingga 5 MB bagi setiap muat naik.');
  if(typeof b.base64!=='string'||b.base64.length>Math.ceil(SCRIPT_MAX_BYTES/3)*4||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b.base64))fail('Kandungan fail tidak sah.');
  const bytes=atob(b.base64);if(bytes.length!==ticket.size)fail('Saiz kandungan fail tidak sepadan.');

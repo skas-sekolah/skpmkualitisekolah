@@ -77,6 +77,7 @@ export function resourcesCommand(d:SchoolDoc,m:Row,b:Row){
  if(b.action==='folder-id'){
   const reservation=store.resources?.reservations?.find(r=>r.id===b.uploadId&&r.actorId===m.id&&r.year===b.year);if(!reservation)fail('Sesi muat naik tidak ditemui. Cuba semula.',403);
   if(reservation.root!==folderId(evidenceFolder(store.resources?.settings??defaults(),reservation.module))||!!reservation.moduleRoot!==!!store.resources?.settings?.moduleFolders?.[reservation.module as EvidenceModule])fail('Folder sekolah telah berubah. Cuba muat naik semula.',409);
+  if(reservation.module==='management'){const r=managementView(d,m,b.year).records.find(r=>r.aspect===reservation.aspect);if(!r?.canEdit||r.data.mode==='unit-actions'&&!r.data.rows?.some(row=>row.id===reservation.unitId&&row.canEdit))fail('Akses muat naik unit telah ditarik balik.',403);}
   if(reservation.module==='standard4')checkPdpcUpload(d,m,reservation.aspect,reservation.stage,b.year,reservation.epoch);
   const candidate=str(b.candidate,160),level=b.level;if(!/^[a-zA-Z0-9_-]{10,160}$/.test(candidate)||!['module','year','aspect'].includes(level))fail('Folder muat naik tidak sah.');
   const base=reservation.root+':'+reservation.module+(reservation.moduleRoot?':direct':''),key=base+(level==='module'?'':':'+reservation.year)+(level==='aspect'?':'+reservation.aspect:'');store.resources!.folders??={};const folders=store.resources!.folders;
@@ -87,16 +88,16 @@ export function resourcesCommand(d:SchoolDoc,m:Row,b:Row){
  if(b.action==='reserve-upload'){
   const module=b.module as EvidenceModule,aspect=str(b.aspect,80),action=str(b.actionId??'',10).toLowerCase();if(!evidenceModules.includes(module))fail('Modul evidens tidak sah.');
   if(module==='strength'){if(!ASPECTS.some(a=>a.id===aspect)||action)fail('Aspek tidak sah.');const r=strengthView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens aspek ini.',403);}
-  if(module==='management'){const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect),r=managementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!unit||action&&!unit.actions.some(a=>a.id===action))fail('Tindakan tidak sah.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens standard ini.',403);}
+  if(module==='management'){const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect),r=managementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!unit||action&&!unit.actions.some(a=>a.id===action))fail('Tindakan tidak sah.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens standard ini.',403);if(r.data.mode==='unit-actions'&&!(r.data.rows??[]).some(row=>row.id===b.unitId&&row.canEdit))fail('Anda tidak boleh memuat naik evidens unit ini.',403);}
   if(module==='achievement'){const r=achievementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(action)fail('Medan tindakan tidak digunakan bagi Standard 5.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens Standard 5 ini.',403);}
   if(module==='standard4'){if(action)fail('Tindakan tidak digunakan bagi pencerapan.');checkPdpcUpload(d,m,aspect,b.stage,b.year,b.epoch);}
   const settings=store.resources?.settings??defaults(),root=folderId(evidenceFolder(settings,module));if(!root||!uploadConnectionReady({...settings,scriptConfigured:!!store.resources?.scriptSecret}))fail('Admin perlu melengkapkan tetapan Google Drive dahulu.',409);
   const ext=str(b.extension,10).toLowerCase();if(!['pdf','jpg','jpeg','png','webp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','odt','ods','odp'].includes(ext))fail('Jenis fail tidak disokong.');if(!Number.isInteger(b.size)||b.size<1||b.size>20*1024*1024)fail('Saiz fail mestilah 1 bait hingga 20 MB.');
   store.resources??={};store.resources.counters??={};const code=module==='standard4'?'4.'+aspect+'.'+b.stage:aspect+(action?'.'+action.toUpperCase():''),key=[b.year,module,code].join(':'),n=(store.resources.counters[key]??0)+1;store.resources.counters[key]=n;
   const name=module==='strength'?aspect+'-'+String(n).padStart(3,'0')+'.'+ext:code+'('+n+').'+ext;
-  const upload={id:crypto.randomUUID(),actorId:m.id,year:b.year,module,aspect,action,name,size:b.size,root,moduleRoot:!!settings.moduleFolders?.[module],...(module==='standard4'?{stage:b.stage,epoch:b.epoch}:{}),createdAt:now()};
+  const upload={id:crypto.randomUUID(),actorId:m.id,year:b.year,module,aspect,action,...(module==='management'?{unitId:typeof b.unitId==='string'?b.unitId:undefined}:{}),name,size:b.size,root,moduleRoot:!!settings.moduleFolders?.[module],...(module==='standard4'?{stage:b.stage,epoch:b.epoch}:{}),createdAt:now()};
   store.resources.reservations=[...(store.resources.reservations??[]).filter(r=>Date.parse(r.createdAt)>Date.now()-86400000),upload].slice(-500);
-  audit(d,m,'evidence_upload_reserved',upload.id,null,{module,aspect,action,name,size:b.size});return {upload,settings:resourcesView(d,m,b.year).settings};
+  audit(d,m,'evidence_upload_reserved',upload.id,null,{module,aspect,action,...(module==='management'?{unitId:typeof b.unitId==='string'?b.unitId:undefined}:{}),name,size:b.size});return {upload,settings:resourcesView(d,m,b.year).settings};
  }
  fail('Tindakan tetapan tidak sah.');
 }

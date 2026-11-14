@@ -70,3 +70,28 @@ console.log('PASS workbook refinement: dynamic action maxima, exact normalized p
 reportD.pdpc={version:2,epoch:'existing-rounds',revision:1,assignments:{}};
 const modernReport=view(reportD).report;assert.equal(modernReport.pdpc.submitted.kedua.count,1,'Round 2 must appear in modern-school reports');assert.equal(modernReport.pdpc.submitted.kedua.overall,100);assert.equal(modernReport.pdpc.submitted.all.expectedCount,6);assert.equal(modernReport.pdpc.submitted.all.count,2);assert.equal(modernReport.pdpc.submitted.all.overall,50,'Second observation contributes to the existing report formula');
 console.log('PASS modern Standard 4 reports include the second observation in the stage filter, totals, coverage and existing averages.');
+
+// Unit-specific action scores, server projection, lifecycle and revocation.
+{
+ const doc=fixture(),aspect='3.1.2.1';
+ call(doc,'admin',{action:'assign-units',aspect,revision:0,rows:[{id:'math',name:'Matematik',memberIds:['writer']},{id:'science',name:'Sains',memberIds:['other']}]});
+ const rec=id=>view(doc,id).records.find(r=>r.aspect===aspect),command=(id,b)=>call(doc,id,{aspect,...b});
+ assert.deepEqual(rec('writer').data.rows.map(r=>r.id),['math']);assert.deepEqual(rec('other').data.rows.map(r=>r.id),['science']);assert.equal(rec('admin').data.rows.length,2);assert.equal(rec('reviewer').data.rows.length,2);
+ assert.equal(rec('writer').data.mode,'unit-actions');
+ const payload=id=>structuredClone(rec(id).data);
+ let input=payload('writer');input.rows[0].data={...raw(aspect,4),evidence:['https://example.test/math']};
+ command('writer',{action:'save',revision:1,data:input,mutationId:'aaaa1111-bbbb-cccc'});
+ assert.equal(rec('admin').data.rows[1].data.scores.a,undefined,'Saving math never overwrites science');
+ const before=structuredClone(doc);command('writer',{action:'save',revision:1,data:input,mutationId:'aaaa1111-bbbb-cccc'});assert.deepEqual(doc,before);
+ denied(doc,'writer',{aspect,action:'save',revision:2,mutationId:'aaaa2222-bbbb-cccc',data:payload('admin')},403);
+ const bad=payload('writer');bad.rows[0].data={...bad.rows[0].data,mode:'units',rows:unitData.rows};denied(doc,'writer',{aspect,action:'save',revision:2,mutationId:'aaaa2222-bbbb-cccc',data:bad},400);
+ command('writer',{action:'submit',revision:2});assert.equal(rec('writer').canEdit,false);assert.equal(rec('other').canEdit,true);assert.equal(rec('admin').status,'draft');
+ input=payload('other');input.rows[0].data={...raw(aspect,0),evidence:['https://example.test/science']};command('other',{action:'save',revision:3,data:input,mutationId:'aaaa3333-bbbb-cccc'});command('other',{action:'submit',revision:4});
+ assert.equal(rec('admin').status,'submitted');assert.equal(M.managementTotals(aspect,rec('admin').data).percentage,50);command('reviewer',{action:'verify',revision:5});assert.ok(rec('admin').data.rows.every(r=>r.status==='verified'));
+ command('reviewer',{action:'reopen',revision:6,feedback:'Semak skor tindakan unit.'});
+ command('admin',{action:'assign-units',revision:7,rows:[{id:'math',name:'Matematik',memberIds:['other']},{id:'science',name:'Sains',memberIds:['other']}]});
+ assert.equal(rec('writer').canRead,false);assert.deepEqual(rec('writer').data.rows,undefined);assert.equal(rec('writer').data.evidence.length,0);
+ denied(doc,'writer',{aspect,action:'save',revision:8,data:input,mutationId:'aaaa4444-bbbb-cccc'},403);
+ const legacy=fixture();legacy.management={2026:{[aspect]:{...M.emptyManagementRecord(aspect,2026),data:unitData}}};assert.ok(view(legacy).records.find(r=>r.aspect===aspect).data.rows.every(row=>Object.keys(row.data.scores).length===0),'Legacy percentages are never converted into invented action scores');
+ console.log('PASS unit actions: per-unit PPS read/write isolation, forged cross-unit save rejection, no manual percentage mode, independent submissions, zero scores, report totals, PGB verification/reopening, immediate revocation and preserved legacy data.');
+}

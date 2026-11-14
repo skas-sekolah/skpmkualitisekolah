@@ -15,7 +15,7 @@ async function ensureFolder(token:string,meta:{id:string;parent:string;name:stri
  if(r.status===404){r=await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,mimeType,parents',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({id:meta.id,name:meta.name,mimeType:'application/vnd.google-apps.folder',parents:[meta.parent]}),signal:AbortSignal.timeout(30000)});if(r.status===409)r=await fetch(url,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(30000)});}
  if(!r.ok)throw Error('Folder evidens belum dapat disediakan. Semak akses Google Drive dan cuba semula.');const saved=await r.json();if(saved.mimeType!=='application/vnd.google-apps.folder'||!saved.parents?.includes(meta.parent))throw Error('Folder evidens tidak sepadan dengan folder sekolah.');return saved.id as string;
 }
-export async function uploadDriveEvidence(file:File,context:{module:EvidenceModule;aspect:string;actionId?:string;year:number;stage?:string;epoch?:string},settings:DriveSettings,token:string){
+export async function uploadDriveEvidence(file:File,context:{module:EvidenceModule;aspect:string;actionId?:string;unitId?:string;year:number;stage?:string;epoch?:string},settings:DriveSettings,token:string){
  const extension=file.name.split('.').pop()?.toLowerCase()??'';
  const {upload}=await resourcesAPI({action:'reserve-upload',...context,extension,size:file.size});
  // Opening the chosen root in Picker grants drive.file access to that folder only.
@@ -27,7 +27,7 @@ export async function uploadDriveEvidence(file:File,context:{module:EvidenceModu
 }
 export async function prepareDrive(settings:DriveSettings,module:EvidenceModule){const folder=evidenceFolder(settings,module);if(!folder)throw Error('Admin belum menetapkan folder evidens modul ini.');if(!googleConnectionReady(settings))throw Error('Muat naik terus belum disambungkan. Buka folder Google Drive, muat naik fail di sana dan tambah pautan fail sebagai evidens.');const token=await driveToken(settings),picked=await chooseDriveFolder(settings,token),expected=folder.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1];if(picked.id!==expected)throw Error('Pilih folder sekolah yang sama dengan tetapan pentadbir.');return token;}
 
-export async function uploadScriptEvidence(file:File,context:{module:EvidenceModule;aspect:string;actionId?:string;year:number;stage?:string;epoch?:string}){
+export async function uploadScriptEvidence(file:File,context:{module:EvidenceModule;aspect:string;actionId?:string;unitId?:string;year:number;stage?:string;epoch?:string}){
  if(file.size>5*1024*1024)throw Error('Maksimum 5 MB bagi setiap fail melalui Apps Script.');
  const {upload}=await resourcesAPI({action:'reserve-upload',...context,extension:file.name.split('.').pop()?.toLowerCase(),size:file.size});
  const base64=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Fail tidak dapat dibaca.'));reader.readAsDataURL(file);});
