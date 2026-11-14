@@ -20,3 +20,10 @@ export function inspectSchoolChoices(values:unknown[],label:string){
  if(names.length>200)errors.push(label+': maksimum 200 nama unik.');
  return {names,duplicates,errors};
 }
+
+export function pdpcEvidenceCode(name:string,stage:string){
+ const prefix=name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').match(/[A-Za-z0-9]+/g)?.map(word=>word[0].toUpperCase()+word.slice(1).toLowerCase()).join('').slice(0,120)||'Guru';
+ const suffix:Record<string,string>={kendiri:'Kendiri',pertama:'Pencerapan1',kedua:'Pencerapan2'};
+ if(!suffix[stage])throw Error('Jenis penilaian tidak sah.');
+ return prefix+suffix[stage];
+}
