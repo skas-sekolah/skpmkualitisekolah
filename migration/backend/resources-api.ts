@@ -6,7 +6,7 @@ import {ASPECTS,validYear} from './strength-model.ts';
 import {MANAGEMENT_UNITS,unitEvidenceCode} from './management-model.ts';
 import {strengthCommand,strengthView} from './strength-api.ts';
 import {managementCommand,managementView} from './management-api.ts';
-import {inspectSchoolChoices,evidenceModules,evidenceModuleLabels,evidenceFolder,uploadConnectionReady,type DriveSettings,type AchievementPSS,type EvidenceModule} from './resources-model.ts';
+import {pdpcEvidenceCode,inspectSchoolChoices,evidenceModules,evidenceModuleLabels,evidenceFolder,uploadConnectionReady,type DriveSettings,type AchievementPSS,type EvidenceModule} from './resources-model.ts';
 export type Resources={scriptSecret?:string;pdpcConfirmations?:Record<string,{signature:string;by:string;at:string}>;lists?:Record<string,{revision:number;classes:string[];subjects:string[]}>;settings?:DriveSettings;folders?:Record<string,string>;counters?:Record<string,number>;reservations?:Row[];pss?:Record<string,{revision:number;rows:AchievementPSS[]}>};
 export type ResourcesStore=SchoolDoc&{resources?:Resources};
 const defaults=():DriveSettings=>({revision:0,folderUrl:'',moduleFolders:{},clientId:'',apiKey:'',projectNumber:'',updatedAt:null});
@@ -93,7 +93,7 @@ export function resourcesCommand(d:SchoolDoc,m:Row,b:Row){
   if(module==='standard4'){if(action)fail('Tindakan tidak digunakan bagi pencerapan.');checkPdpcUpload(d,m,aspect,b.stage,b.year,b.epoch);}
   const settings=store.resources?.settings??defaults(),root=folderId(evidenceFolder(settings,module));if(!root||!uploadConnectionReady({...settings,scriptConfigured:!!store.resources?.scriptSecret}))fail('Admin perlu melengkapkan tetapan Google Drive dahulu.',409);
   const ext=str(b.extension,10).toLowerCase();if(!['pdf','jpg','jpeg','png','webp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','odt','ods','odp'].includes(ext))fail('Jenis fail tidak disokong.');if(!Number.isInteger(b.size)||b.size<1||b.size>20*1024*1024)fail('Saiz fail mestilah 1 bait hingga 20 MB.');
-  store.resources??={};store.resources.counters??={};const code=unitName?unitEvidenceCode(unitName,aspect,action):module==='standard4'?'4.'+aspect+'.'+b.stage:aspect+(action?'.'+action.toUpperCase():''),key=[b.year,module,code].join(':'),n=(store.resources.counters[key]??0)+1;store.resources.counters[key]=n;
+  store.resources??={};store.resources.counters??={};const code=unitName?unitEvidenceCode(unitName,aspect,action):module==='standard4'?pdpcEvidenceCode(d.teachers.find(t=>t.id===aspect)!.name,String(b.stage)):aspect+(action?'.'+action.toUpperCase():''),key=[b.year,module,code].join(':'),n=(store.resources.counters[key]??0)+1;store.resources.counters[key]=n;
   const name=module==='strength'?aspect+'-'+String(n).padStart(3,'0')+'.'+ext:code+'('+n+').'+ext;
   const upload={id:crypto.randomUUID(),actorId:m.id,year:b.year,module,aspect,action,...(module==='management'?{unitId:typeof b.unitId==='string'?b.unitId:undefined}:{}),name,size:b.size,root,moduleRoot:!!settings.moduleFolders?.[module],...(module==='standard4'?{stage:b.stage,epoch:b.epoch}:{}),createdAt:now()};
   store.resources.reservations=[...(store.resources.reservations??[]).filter(r=>Date.parse(r.createdAt)>Date.now()-86400000),upload].slice(-500);
