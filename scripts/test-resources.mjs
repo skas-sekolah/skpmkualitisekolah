@@ -98,3 +98,11 @@ const rubrics=JSON.parse(fs.readFileSync('app/management-rubric.json','utf8'));f
  denied('p1',{action:'folder-id',uploadId:ticket.upload.id,candidate:'FOLDER_FIXTURE_UNIT_123',level:'year'},403);
  console.log('PASS unit evidence: upload reservations require the assigned unit, forged/missing unit IDs fail, ticket folder access is revoked immediately after reassignment.');
 }
+{
+ const aspect='3.2.4.1',revision=A.managementView(d,who('admin'),2026).records.find(r=>r.aspect===aspect).revision;
+ call('admin',{action:'pps-assignments',groups:[{module:'management',rows:[{aspect,revision,units:[{id:'football',name:'Bola sepak',memberIds:['p1']},{id:'badminton',name:'Badminton',memberIds:['p2']}]}]}]});
+ const visible=A.managementView(d,who('p1'),2026).records.find(r=>r.aspect===aspect);
+ assert.deepEqual(visible.data.rows.map(r=>r.id),['football']);
+ denied('admin',{action:'pps-assignments',groups:[{module:'management',rows:[{aspect,revision,units:[]}]}]},409);
+ console.log('PASS central PPS unit assignment: atomic unit dispatch, persisted unit members, immediate read permissions and stale revision rejection.');
+}

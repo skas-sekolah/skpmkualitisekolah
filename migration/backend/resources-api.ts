@@ -62,7 +62,7 @@ export function resourcesCommand(d:SchoolDoc,m:Row,b:Row){
   admin(m);if(!['strength','management','achievement'].includes(b.module)||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>42)fail('Senarai tugasan tidak sah.');
   const ids=new Set();for(const row of b.rows){if(ids.has(row.aspect))fail('Aspek berulang.');ids.add(row.aspect);}
   // Validate against a private copy first: a single invalid or stale row leaves every assignment unchanged.
-  const copy=structuredClone(d);for(const row of b.rows){const cmd={...row,action:'assign',year:b.year};if(b.module==='strength')strengthCommand(copy,m,cmd);else if(b.module==='management')managementCommand(copy,m,cmd);else achievementCommand(copy,m,cmd);}
+  const copy=structuredClone(d);for(const row of b.rows){const cmd={...row,action:b.module==='management'&&Array.isArray(row.units)?'assign-units':'assign',...(Array.isArray(row.units)?{rows:row.units}:{}),year:b.year};if(b.module==='strength')strengthCommand(copy,m,cmd);else if(b.module==='management')managementCommand(copy,m,cmd);else achievementCommand(copy,m,cmd);}
   if(b.module==='strength')(d as Row).strength=(copy as Row).strength;else if(b.module==='management')(d as Row).management=(copy as Row).management;else{(d as Row).achievement=(copy as Row).achievement;store.resources??={};store.resources.pss=(copy as ResourcesStore).resources?.pss;}d.audit=copy.audit;
   audit(d,m,'assignments_confirmed',b.module+':'+b.year,null,{aspects:[...ids]});return {ok:true,count:b.rows.length};
  }
