@@ -1192,8 +1192,8 @@ export type ManagementUnitId=typeof MANAGEMENT_UNITS[number]['id'];
 export type ManagementStatus='draft'|'submitted'|'returned'|'verified';
 export const STATUS_NAMES:Record<ManagementStatus,string>={draft:'Draf',submitted:'Menunggu semakan',returned:'Perlu pembetulan',verified:'Disahkan'};
 export type ActionEvidence={document:string;documents?:string[];notes:string;url:string;urls?:string[]};
-export type ManagementRow={id:string;name:string;percent:number|null;notes:string;url:string};
-export type ManagementData={scores:Record<string,number|null>;notes:string;evidence:string[];mode?:'actions'|'units';rows?:ManagementRow[];actionEvidence?:Record<string,ActionEvidence>};
+export type ManagementRow={id:string;name:string;percent:number|null;notes:string;url:string;data?:ManagementData;memberIds?:string[];status?:ManagementStatus;lastEditorId?:string;canEdit?:boolean};
+export type ManagementData={scores:Record<string,number|null>;notes:string;evidence:string[];mode?:'actions'|'units'|'unit-actions';rows?:ManagementRow[];actionEvidence?:Record<string,ActionEvidence>};
 export type ReportNotes={revision:number;principal:string;schoolType:string;date:string;strengths:string;improvements:string;updatedAt:string|null};
 export type PdpcSummary={count:number;expectedCount:number;overall:number|null;aspects:{code:string;value:number|null;count:number}[]};
 export type SchoolReport={notes:ReportNotes;pdpc:Record<'submitted'|'all',Record<'all'|'kendiri'|'pertama'|'kedua',PdpcSummary>>};
@@ -1201,7 +1201,7 @@ export type ManagementRecord={aspect:ManagementUnitId;year:number;revision:numbe
 export type ManagementBundle={isPGB?:boolean;year:number;records:ManagementRecord[];people:{id:string;name:string}[];school:{code:string;name:string};sessionId:string;report?:SchoolReport};
 export type PendingManagement={year:number;aspect:ManagementUnitId;revision:number;data:ManagementData;mutationId:string;error?:string};
 export function emptyManagementData():ManagementData{return {scores:{},notes:'',evidence:[]};}
-export function emptyManagementRecord(aspect:ManagementUnitId,year:number):ManagementRecord{return {aspect,year,revision:0,status:'draft',assigneeId:null,reviewerId:null,data:{...emptyManagementData(),mode:aggregateUnit(aspect)?'units':'actions'},canRead:false,canEdit:false,canReview:false,updatedAt:null,updatedBy:null,submittedAt:null,verifiedAt:null,verifiedBy:null,feedback:''};}
+export function emptyManagementRecord(aspect:ManagementUnitId,year:number):ManagementRecord{return {aspect,year,revision:0,status:'draft',assigneeId:null,reviewerId:null,data:{...emptyManagementData(),mode:aggregateUnit(aspect)?'unit-actions':'actions'},canRead:false,canEdit:false,canReview:false,updatedAt:null,updatedBy:null,submittedAt:null,verifiedAt:null,verifiedBy:null,feedback:''};}
 export function validYear(year:unknown):year is number{return typeof year==='number'&&Number.isInteger(year)&&year>=2020&&year<=2100;}
 export function validManagementUnit(id:unknown):id is ManagementUnitId{return MANAGEMENT_UNITS.some(u=>u.id===id);}
 export function cleanManagementData(aspect:ManagementUnitId,input:unknown):ManagementData{
@@ -1213,15 +1213,20 @@ export function cleanManagementData(aspect:ManagementUnitId,input:unknown):Manag
  if(typeof v.notes!=='string'||v.notes.length>2000)throw Error('Catatan mestilah teks sehingga 2,000 aksara.');result.notes=v.notes.trim();
  if(!Array.isArray(v.evidence)||v.evidence.length>20)throw Error('Maksimum 20 pautan evidens.');
  result.evidence=v.evidence.map(value=>{if(typeof value!=='string'||value.length>500)throw Error('Pautan evidens terlalu panjang atau tidak sah.');return value.trim();}).filter(Boolean).map(value=>{let u:URL;try{u=new URL(value);}catch{throw Error('Gunakan pautan evidens http atau https yang lengkap.');}if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw Error('Pautan evidens tidak sah.');return u.href;});
- result.mode=v.mode==='units'?'units':'actions';if(v.mode!==undefined&&!['actions','units'].includes(v.mode))throw Error('Kaedah pengisian tidak sah.');if(result.mode==='units'&&!aggregateUnit(aspect))throw Error('Standard ini menggunakan skor tindakan.');
+ result.mode=v.mode==='unit-actions'?'unit-actions':v.mode==='units'?'units':'actions';if(v.mode!==undefined&&!['actions','units','unit-actions'].includes(v.mode))throw Error('Kaedah pengisian tidak sah.');if(result.mode!=='actions'&&!aggregateUnit(aspect))throw Error('Standard ini menggunakan skor tindakan.');
  if(v.rows!==undefined&&!Array.isArray(v.rows))throw Error('Senarai unit tidak sah.');if((v.rows?.length??0)>50)throw Error('Maksimum 50 panitia / unit.');const ids=new Set<string>(),names=new Set<string>();
- result.rows=(v.rows??[]).map(row=>{if(!row||typeof row!=='object')throw Error('Baris unit tidak sah.');const id=boundedText(row.id,80),name=boundedText(row.name,180),key=name.toLocaleUpperCase('ms-MY');if(!id||ids.has(id)||name&&names.has(key))throw Error('Elakkan ID atau nama panitia / unit berulang.');ids.add(id);if(name)names.add(key);const percent=row.percent;if(percent!==null&&(typeof percent!=='number'||!Number.isFinite(percent)||percent<0||percent>100))throw Error('Peratus unit mestilah antara 0 hingga 100 atau kosong.');return {id,name,percent,notes:boundedText(row.notes??'',500),url:evidenceURL(row.url??'')};});
+ result.rows=(v.rows??[]).map(row=>{if(!row||typeof row!=='object')throw Error('Baris unit tidak sah.');const id=boundedText(row.id,80),name=boundedText(row.name,180),key=name.toLocaleUpperCase('ms-MY');if(!id||ids.has(id)||name&&names.has(key))throw Error('Elakkan ID atau nama panitia / unit berulang.');ids.add(id);if(name)names.add(key);const percent=row.percent;if(percent!==null&&(typeof percent!=='number'||!Number.isFinite(percent)||percent<0||percent>100))throw Error('Peratus unit mestilah antara 0 hingga 100 atau kosong.');if(row.data?.rows?.length||row.data?.mode&&row.data.mode!=='actions')throw Error('Unit hanya menerima skor tindakan 0–4.');return {id,name,percent,notes:boundedText(row.notes??'',500),url:evidenceURL(row.url??''),...(result.mode==='unit-actions'?{data:cleanManagementData(aspect,row.data??emptyManagementData())}:{})};});
  if(v.actionEvidence!==undefined&&(!v.actionEvidence||typeof v.actionEvidence!=='object'||Array.isArray(v.actionEvidence)))throw Error('Evidens tindakan tidak sah.');result.actionEvidence={};
  for(const [id,e] of Object.entries(v.actionEvidence??{})){if(!keys.has(id)||!e||typeof e!=='object')throw Error('Evidens tindakan tidak sah.');const document=boundedText(e.document??'',240);if(e.documents!==undefined&&(!Array.isArray(e.documents)||e.documents.length>25))throw Error('Pilihan dokumen tidak sah.');const documents=[...new Set([...(e.documents??[]),...(document?[document]:[])])];if(documents.some(d=>typeof d!=='string'||!documentTypes(aspect).includes(d)))throw Error('Pilih kategori dokumen yang disediakan.');if(e.urls!==undefined&&(!Array.isArray(e.urls)||e.urls.length>20))throw Error('Maksimum 20 pautan evidens tindakan.');const urls=[...new Set([...(e.urls??[]),...(e.url?[e.url]:[])].map(evidenceURL).filter(Boolean))];result.actionEvidence[id]={document:documents[0]??'',documents,notes:boundedText(e.notes??'',500),url:urls[0]??'',urls};}
  return result;
 }
 export function managementIssues(aspect:ManagementUnitId,data:ManagementData):string[]{
  const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect);if(!unit)return ['Standard tidak sah.'];const issues:string[]=[];
+ if(data.mode==='unit-actions'){
+  if(!data.rows?.length)issues.push('Admin perlu menetapkan unit dan PPS dahulu.');
+  for(const row of data.rows??[]){if(!row.name.trim())issues.push('Nama unit diperlukan.');issues.push(...managementIssues(aspect,row.data??emptyManagementData()).map(message=>row.name+': '+message));}
+  return issues;
+ }
  if(data.mode==='units'){
   if(!aggregateUnit(aspect))issues.push('Standard ini menggunakan skor tindakan.');
   if(!data.rows?.length)issues.push('Tambah sekurang-kurangnya satu panitia / unit.');
@@ -1232,8 +1237,12 @@ export function managementIssues(aspect:ManagementUnitId,data:ManagementData):st
  const detailed=data.mode==='units'?data.rows?.some(r=>r.notes.trim()||r.url):Object.values(data.actionEvidence??{}).some(e=>e.notes.trim()||e.url||e.document);
  if(data.notes.trim().length<5&&!data.evidence.some(s=>s.trim())&&!detailed)issues.push('Nyatakan catatan / rujukan evidens atau pautan evidens sebelum menghantar.');return issues;
 }
-export function managementTotals(aspect:ManagementUnitId,data:ManagementData){
+export function managementTotals(aspect:ManagementUnitId,data:ManagementData):{count:number;filled:number;maximum:number|null;total:number|null;percentage:number|null;preview:number|null;frequencies:number[]|null;mode:'actions'|'units'|'unit-actions'}{
  const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect)!;
+ if(data.mode==='unit-actions'){
+  const rows=data.rows??[],totals=rows.map(row=>managementTotals(aspect,row.data??emptyManagementData())),values=totals.flatMap(t=>t.percentage===null?[]:[t.percentage]);
+  return {count:rows.length,filled:values.length,maximum:null,total:null,percentage:rows.length&&values.length===rows.length?mean(values):null,preview:mean(values),frequencies:null,mode:'unit-actions' as const};
+ }
  if(data.mode==='units'){
   const rows=data.rows??[],values=rows.map(r=>r.percent).filter((n):n is number=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100),complete=rows.length>0&&values.length===rows.length&&rows.every(r=>r.name.trim());
   return {count:rows.length,filled:values.length,maximum:null,total:null,percentage:complete?mean(values):null,preview:mean(values),frequencies:null,mode:'units' as const};
@@ -1325,3 +1334,9 @@ export const DOCUMENT_TYPES:Record<string,string[]>={
  ]
 };
 export function documentTypes(aspect:ManagementUnitId){const group=MANAGEMENT_UNITS.find(u=>u.id===aspect)!.group;return DOCUMENT_TYPES[group]??["Lain-lain"];}
+
+// Legacy percentages remain stored for audit; never fabricate action scores from them.
+export function unitActionData(aspect:ManagementUnitId,data:ManagementData):ManagementData{
+ if(!aggregateUnit(aspect))return data;
+ return {...data,mode:'unit-actions',rows:(data.rows??[]).map(row=>({...row,data:row.data??emptyManagementData(),memberIds:row.memberIds??[],status:row.status??'draft'}))};
+}

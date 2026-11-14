@@ -8,13 +8,14 @@ const templates=source.sheets as Record<string,Sheet>;
 const unitSheets:Record<string,string>={'3.1.2.1':'Panitia MP','3.1.2.2':'Panitia MP','3.1.2.3':'Panitia MP','3.1.2.4':'Panitia MP','3.2.2.1':'Kelab_Persatuan','3.2.3.1':'Badan_Beruniform','3.2.4.1':'Sukan_Permainan'};
 const format=(n:number|null|undefined)=>typeof n==='number'?n.toLocaleString('ms-MY',{maximumFractionDigits:2}):'';
 export function TemplatePrint({records,bundle,year}:{records:ManagementRecord[];bundle:ManagementBundle;year:number}){
+ records=records.flatMap(r=>r.data.mode==='unit-actions'?(r.data.rows??[]).map(row=>({...r,aspect:r.aspect,data:{...(row.data??{scores:{},notes:'',evidence:[]}),mode:'actions' as const},unitName:row.name})): [r]);
  const seen=new Set<string>();
  return <div className="score-template-print"><style>{printStyles}</style>{records.map(record=>{
   const isUnits=record.data.mode==='units',name=isUnits?unitSheets[record.aspect]:record.aspect,sheet=templates[name];
   if(isUnits&&seen.has(name))return null;seen.add(name);
   const related=isUnits?records.filter(r=>unitSheets[r.aspect]===name):[record];
   const people=[...new Set(related.flatMap(r=>r.pssIds??(r.assigneeId?[r.assigneeId]:[])))].map(id=>bundle.people.find(p=>p.id===id)?.name||'').filter(Boolean);
-  return <section className="score-template-sheet" key={name||record.aspect}><header><b>{bundle.school.name} · {bundle.school.code}</b><span>Tahun {year}</span><p>Pegawai Penilai Standard: {people.join(', ')||'Belum ditetapkan'}</p></header>{sheet&&(!unitSheets[record.aspect]||isUnits)?<SheetTable sheet={sheet} name={name} records={related}/>:<Fallback record={record}/>}
+  return <section className="score-template-sheet" key={record.aspect+('unitName' in record?record.unitName:'')}><header><b>{bundle.school.name} · {bundle.school.code}</b><span>Tahun {year}</span>{'unitName' in record&&<h2>{String(record.unitName)}</h2>}<p>Pegawai Penilai Standard: {people.join(', ')||'Belum ditetapkan'}</p></header>{sheet&&(!unitSheets[record.aspect]||isUnits)?<SheetTable sheet={sheet} name={name} records={related}/>:<Fallback record={record}/>}
   <footer><b>Catatan dan evidens</b>{related.map(r=><div key={r.aspect}><b>{r.aspect}</b>{r.data.notes&&<p>{r.data.notes}</p>}{r.data.evidence.map(url=><p key={url}>{url}</p>)}{Object.entries(r.data.actionEvidence??{}).map(([action,e])=><div key={action}><p>{action.toUpperCase()}: {(e.documents??(e.document?[e.document]:[])).join(', ')}{e.notes?' — '+e.notes:''}</p>{(e.urls??(e.url?[e.url]:[])).map(url=><p key={url}>{url}</p>)}</div>)}{r.data.rows?.filter(row=>row.notes||row.url).map(row=><p key={row.id}>{row.name}: {row.notes} {row.url}</p>)}</div>)}</footer></section>;
  })}</div>;
 }
