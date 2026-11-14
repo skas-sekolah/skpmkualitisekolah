@@ -93,7 +93,8 @@ const rubrics=JSON.parse(fs.readFileSync('app/management-rubric.json','utf8'));f
  A.managementCommand(d,who('admin'),{action:'assign-units',year:2026,aspect,revision:0,rows:[{id:'football',name:'Bola sepak',memberIds:['p1']},{id:'badminton',name:'Badminton',memberIds:['p2']}]});
  const upload={action:'reserve-upload',module:'management',aspect,unitId:'football',actionId:'a',size:10,extension:'pdf'};
  denied('p2',upload,403);denied('p1',{...upload,unitId:'badminton'},403);denied('p1',{...upload,unitId:undefined},403);
- const ticket=call('p1',upload);assert.equal(ticket.upload.unitId,'football');
+ const ticket=call('p1',upload);assert.equal(ticket.upload.unitId,'football');assert.match(ticket.upload.name,/^BolaSepak3\.2\.4\.1\(a\)\(1\)\.pdf$/);
+ const second=call('p1',{...upload,unitName:'ForgedName'});assert.match(second.upload.name,/^BolaSepak3\.2\.4\.1\(a\)\(2\)\.pdf$/);assert.ok(!second.upload.name.includes('ForgedName'));
  A.managementCommand(d,who('admin'),{action:'assign-units',year:2026,aspect,revision:1,rows:[{id:'football',name:'Bola sepak',memberIds:['p2']},{id:'badminton',name:'Badminton',memberIds:['p2']}]});
  denied('p1',{action:'folder-id',uploadId:ticket.upload.id,candidate:'FOLDER_FIXTURE_UNIT_123',level:'year'},403);
  console.log('PASS unit evidence: upload reservations require the assigned unit, forged/missing unit IDs fail, ticket folder access is revoked immediately after reassignment.');
