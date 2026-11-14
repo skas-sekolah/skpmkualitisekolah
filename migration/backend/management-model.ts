@@ -1340,3 +1340,10 @@ export function unitActionData(aspect:ManagementUnitId,data:ManagementData):Mana
  if(!aggregateUnit(aspect))return data;
  return {...data,mode:'unit-actions',rows:(data.rows??[]).map(row=>({...row,data:row.data??emptyManagementData(),memberIds:row.memberIds??[],status:row.status??'draft'}))};
 }
+
+export const SUBJECT_STANDARDS:ManagementUnitId[]=['3.1.2.1','3.1.2.2','3.1.2.3','3.1.2.4'];
+export function subjectStandard(aspect:string){return SUBJECT_STANDARDS.includes(aspect as ManagementUnitId);}
+export function unitEvidenceCode(name:string,aspect:string,action?:string){
+ const prefix=name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').match(/[A-Za-z0-9]+/g)?.map(word=>word[0].toUpperCase()+word.slice(1).toLowerCase()).join('').slice(0,100)||'Unit';
+ return prefix+aspect+(action?'('+action.toLowerCase()+')':'');
+}

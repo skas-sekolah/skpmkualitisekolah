@@ -95,3 +95,22 @@ console.log('PASS modern Standard 4 reports include the second observation in th
  const legacy=fixture();legacy.management={2026:{[aspect]:{...M.emptyManagementRecord(aspect,2026),data:unitData}}};assert.ok(view(legacy).records.find(r=>r.aspect===aspect).data.rows.every(row=>Object.keys(row.data.scores).length===0),'Legacy percentages are never converted into invented action scores');
  console.log('PASS unit actions: per-unit PPS read/write isolation, forged cross-unit save rejection, no manual percentage mode, independent submissions, zero scores, report totals, PGB verification/reopening, immediate revocation and preserved legacy data.');
 }
+{
+ const d=fixture(),aspect='3.1.2.1',subjects=M.SUBJECT_STANDARDS;
+ call(d,'admin',{action:'assign-units',aspect,revision:0,rows:[{id:'bm',name:'Bahasa Melayu',memberIds:['writer']},{id:'mt',name:'Matematik',memberIds:['other']}]});
+ for(const id of subjects){const r=current(d,id);assert.deepEqual(r.data.rows.map(row=>row.memberIds),[['writer'],['other']]);assert.equal(view(d,'writer').records.find(r=>r.aspect===id).data.rows.length,1);}
+ let r=view(d,'writer').records.find(r=>r.aspect==='3.1.2.2');r.data.rows[0].data={...raw('3.1.2.2',3),evidence:['https://example.test/unit-existing']};call(d,'writer',{action:'save',aspect:'3.1.2.2',revision:r.revision,data:r.data,mutationId:'aaaa9999-bbbb-cccc'});
+ const stored=current(d,'3.1.2.2').data.rows[0].data;
+ call(d,'admin',{action:'assign-units',aspect,revision:current(d,aspect).revision,rows:[{id:'bm',name:'Bahasa Melayu',memberIds:['other']},{id:'mt',name:'Matematik',memberIds:['other']}]});
+ assert.deepEqual(current(d,'3.1.2.2').data.rows[0].data,stored,'Shared PPS changes must preserve each standard scores/evidence');
+ assert.equal(view(d,'writer').records.find(r=>r.aspect===aspect).canRead,false,'Changing one subject assignment revokes all four standards');
+ d.management[2026]['3.1.2.4'].data.rows[0].status='submitted';
+ denied(d,'admin',{action:'assign-units',aspect,revision:current(d,aspect).revision,rows:[{id:'mt',name:'Matematik',memberIds:['other']}]},409);
+ d.management[2026]['3.1.2.4'].data.rows[0].status='draft';
+ call(d,'admin',{action:'assign-units',aspect,revision:current(d,aspect).revision,rows:[{id:'mt',name:'Matematik',memberIds:['other']}]});
+ for(const id of subjects)assert.deepEqual(current(d,id).data.rows.map(row=>row.id),['mt']);
+ assert.ok(d.audit.some(a=>a.action==='management_assign-units'&&a.entityId==='3.1.2.2:2026'&&JSON.parse(a.before).data.rows.some(row=>row.name==='Bahasa Melayu'&&row.data.scores.a===3)),'Deleted scores are retained in audit');
+ const own=view(d,'other');assert.ok(own.records.filter(r=>subjects.includes(r.aspect)).every(r=>r.pssIds.every(id=>id==='other')));assert.ok(own.people.every(p=>p.id==='other'||p.id==='teacher:other-teacher'),'PPS responses exclude other staff names');
+ assert.equal(M.unitEvidenceCode('BAHASA MELAYU','3.2.2.1','a'),'BahasaMelayu3.2.2.1(a)');
+ console.log('PASS shared subject PPS: one assignment across four standards, score/evidence preservation, atomic locked deletion rejection, audited deletion, revocation and own-person response.');
+}

@@ -3,7 +3,7 @@ import {achievementCommand,achievementView,type AchievementStore} from './achiev
 import {effectiveAchievementPSS,emptyAchievementRecord} from './achievement-model.ts';
 import {isPGB,mayWrite,text,assignmentPeople,admin,audit,fail,now,assignmentIdentity,assignedTo,eligiblePPSAssignee,type Row,type SchoolDoc} from './domain.ts';
 import {ASPECTS,validYear} from './strength-model.ts';
-import {MANAGEMENT_UNITS} from './management-model.ts';
+import {MANAGEMENT_UNITS,unitEvidenceCode} from './management-model.ts';
 import {strengthCommand,strengthView} from './strength-api.ts';
 import {managementCommand,managementView} from './management-api.ts';
 import {inspectSchoolChoices,evidenceModules,evidenceModuleLabels,evidenceFolder,uploadConnectionReady,type DriveSettings,type AchievementPSS,type EvidenceModule} from './resources-model.ts';
@@ -86,14 +86,14 @@ export function resourcesCommand(d:SchoolDoc,m:Row,b:Row){
   folders[key]??=candidate;const names:Record<string,string>=evidenceModuleLabels;return {id:folders[key],parent,name:level==='module'?names[reservation.module]:level==='year'?String(reservation.year):reservation.aspect};
  }
  if(b.action==='reserve-upload'){
-  const module=b.module as EvidenceModule,aspect=str(b.aspect,80),action=str(b.actionId??'',10).toLowerCase();if(!evidenceModules.includes(module))fail('Modul evidens tidak sah.');
+  let unitName='';const module=b.module as EvidenceModule,aspect=str(b.aspect,80),action=str(b.actionId??'',10).toLowerCase();if(!evidenceModules.includes(module))fail('Modul evidens tidak sah.');
   if(module==='strength'){if(!ASPECTS.some(a=>a.id===aspect)||action)fail('Aspek tidak sah.');const r=strengthView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens aspek ini.',403);}
-  if(module==='management'){const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect),r=managementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!unit||action&&!unit.actions.some(a=>a.id===action))fail('Tindakan tidak sah.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens standard ini.',403);if(r.data.mode==='unit-actions'&&!(r.data.rows??[]).some(row=>row.id===b.unitId&&row.canEdit))fail('Anda tidak boleh memuat naik evidens unit ini.',403);}
+  if(module==='management'){const unit=MANAGEMENT_UNITS.find(u=>u.id===aspect),r=managementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(!unit||action&&!unit.actions.some(a=>a.id===action))fail('Tindakan tidak sah.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens standard ini.',403);if(r.data.mode==='unit-actions'){const row=r.data.rows?.find(row=>row.id===b.unitId&&row.canEdit);if(!row)fail('Anda tidak boleh memuat naik evidens unit ini.',403);unitName=row!.name;}}
   if(module==='achievement'){const r=achievementView(d,m,b.year).records.find(r=>r.aspect===aspect);if(action)fail('Medan tindakan tidak digunakan bagi Standard 5.');if(!r?.canEdit)fail('Anda tidak boleh memuat naik evidens Standard 5 ini.',403);}
   if(module==='standard4'){if(action)fail('Tindakan tidak digunakan bagi pencerapan.');checkPdpcUpload(d,m,aspect,b.stage,b.year,b.epoch);}
   const settings=store.resources?.settings??defaults(),root=folderId(evidenceFolder(settings,module));if(!root||!uploadConnectionReady({...settings,scriptConfigured:!!store.resources?.scriptSecret}))fail('Admin perlu melengkapkan tetapan Google Drive dahulu.',409);
   const ext=str(b.extension,10).toLowerCase();if(!['pdf','jpg','jpeg','png','webp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','odt','ods','odp'].includes(ext))fail('Jenis fail tidak disokong.');if(!Number.isInteger(b.size)||b.size<1||b.size>20*1024*1024)fail('Saiz fail mestilah 1 bait hingga 20 MB.');
-  store.resources??={};store.resources.counters??={};const code=module==='standard4'?'4.'+aspect+'.'+b.stage:aspect+(action?'.'+action.toUpperCase():''),key=[b.year,module,code].join(':'),n=(store.resources.counters[key]??0)+1;store.resources.counters[key]=n;
+  store.resources??={};store.resources.counters??={};const code=unitName?unitEvidenceCode(unitName,aspect,action):module==='standard4'?'4.'+aspect+'.'+b.stage:aspect+(action?'.'+action.toUpperCase():''),key=[b.year,module,code].join(':'),n=(store.resources.counters[key]??0)+1;store.resources.counters[key]=n;
   const name=module==='strength'?aspect+'-'+String(n).padStart(3,'0')+'.'+ext:code+'('+n+').'+ext;
   const upload={id:crypto.randomUUID(),actorId:m.id,year:b.year,module,aspect,action,...(module==='management'?{unitId:typeof b.unitId==='string'?b.unitId:undefined}:{}),name,size:b.size,root,moduleRoot:!!settings.moduleFolders?.[module],...(module==='standard4'?{stage:b.stage,epoch:b.epoch}:{}),createdAt:now()};
   store.resources.reservations=[...(store.resources.reservations??[]).filter(r=>Date.parse(r.createdAt)>Date.now()-86400000),upload].slice(-500);

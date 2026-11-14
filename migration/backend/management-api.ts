@@ -1,6 +1,6 @@
 import {calculate,rosterActive,stages,type TeacherType} from './scoring.ts';
 import {scoreEntry,isPGB,admin,audit,fail,now,assignmentPeople,eligibleReviewAssignee,assignmentIdentity,assignedMember,assignedTo,eligiblePPSAssignee,type Row,type SchoolDoc} from './domain.ts';
-import {MANAGEMENT_UNITS,aggregateUnit,unitActionData,emptyManagementData,emptyManagementRecord,cleanManagementData,managementIssues,validManagementUnit,validYear,defaultReportNotes,cleanReportNotes,mean,type ReportNotes,type SchoolReport,type PdpcSummary,type ManagementRecord,type ManagementBundle,type ManagementUnitId} from './management-model.ts';
+import {MANAGEMENT_UNITS,SUBJECT_STANDARDS,subjectStandard,aggregateUnit,unitActionData,emptyManagementData,emptyManagementRecord,cleanManagementData,managementIssues,validManagementUnit,validYear,defaultReportNotes,cleanReportNotes,mean,type ReportNotes,type SchoolReport,type PdpcSummary,type ManagementRecord,type ManagementBundle,type ManagementUnitId} from './management-model.ts';
 type Store=SchoolDoc&{management?:Record<string,Partial<Record<ManagementUnitId,ManagementRecord>>>;managementReports?:Record<string,ReportNotes>};
 function unitWriter(d:SchoolDoc,m:Row,row:NonNullable<ManagementRecord['data']['rows']>[number],year:number){return (row.memberIds??[]).some(id=>eligiblePPSAssignee(d,id,year)&&assignedTo(d,id,m.id));}
 function permissions(d:SchoolDoc,m:Row,r:ManagementRecord){
@@ -29,7 +29,7 @@ export function scoringReport(d:SchoolDoc,year:number):SchoolReport{
 export function managementView(d:SchoolDoc,m:Row,year:number):ManagementBundle{
  if(!d.members.some(x=>x.id===m.id&&x.active===1))fail('Akses akaun tidak aktif.',403);
  if(!validYear(year))fail('Pilih tahun antara 2020–2100.');
- return {year,isPGB:isPGB(d,m),records:MANAGEMENT_UNITS.map(a=>{const r=record(d,a.id,year),p=permissions(d,m,r),hasEntry=aggregateUnit(a.id)?(r.data.rows??[]).some(row=>scoreEntry(row.data)):scoreEntry(r.data);if(aggregateUnit(a.id)){r.data.rows=(r.data.rows??[]).filter(row=>p.canAdmin||isPGB(d,m)||unitWriter(d,m,row,year)).map(row=>({...row,canEdit:(p.canAdmin||unitWriter(d,m,row,year))&&['draft','returned'].includes(row.status??'draft')}));if(!p.canAdmin&&!isPGB(d,m)){r.data.notes='';r.data.evidence=[];r.data.scores={};r.data.actionEvidence={};r.feedback='';}}if(!p.canRead){r.data=emptyManagementRecord(a.id,year).data;r.feedback='';}delete r.lastMutationId;delete r.lastMutationActor;return {...r,...p,hasEntry};}),people:assignmentPeople(d,year),school:{code:d.school.code,name:d.school.name},sessionId:m.id,...(m.role==='admin'?{report:scoringReport(d,year)}:{})};
+ return {year,isPGB:isPGB(d,m),records:MANAGEMENT_UNITS.map(a=>{const r=record(d,a.id,year),p=permissions(d,m,r),hasEntry=aggregateUnit(a.id)?(r.data.rows??[]).some(row=>scoreEntry(row.data)):scoreEntry(r.data);if(aggregateUnit(a.id)){r.data.rows=(r.data.rows??[]).filter(row=>p.canAdmin||isPGB(d,m)||unitWriter(d,m,row,year)).map(row=>({...row,canEdit:(p.canAdmin||unitWriter(d,m,row,year))&&['draft','returned'].includes(row.status??'draft')}));if(!p.canAdmin&&!isPGB(d,m)){r.data.notes='';r.data.evidence=[];r.data.scores={};r.data.actionEvidence={};r.feedback='';r.pssIds=(r.pssIds??[]).filter(id=>assignedTo(d,id,m.id));r.assigneeId=r.pssIds[0]??null;}}if(!p.canRead){r.data=emptyManagementRecord(a.id,year).data;r.feedback='';}if(m.role!=='admin'&&!isPGB(d,m)){r.pssIds=(r.pssIds??[]).filter(id=>assignedTo(d,id,m.id));r.assigneeId=r.pssIds[0]??null;r.reviewerId=null;}delete r.lastMutationId;delete r.lastMutationActor;return {...r,...p,hasEntry};}),people:assignmentPeople(d,year).filter(person=>m.role==='admin'||isPGB(d,m)||assignedTo(d,person.id,m.id)),school:{code:d.school.code,name:d.school.name},sessionId:m.id,...(m.role==='admin'?{report:scoringReport(d,year)}:{})};
 }
 export function managementCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
  if(!d.members.some(x=>x.id===m.id&&x.active===1))fail('Akses akaun tidak aktif.',403);
@@ -53,6 +53,7 @@ export function managementCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
   audit(d,m,'management_report_notes',String(b.year),old,next);return managementView(d,m,b.year);
  }
  if(!validManagementUnit(b.aspect))fail('Aspek tidak sah.');
+ if(subjectStandard(b.aspect)&&b.action==='assign-units')return sharedSubjects(d,m,b);
  if(aggregateUnit(b.aspect))return unitCommand(d,m,b);
  const store=d as Store,year=b.year,aspect=b.aspect as ManagementUnitId,r=record(store,aspect,year),before=structuredClone(r),p=permissions(d,m,r);
  if(b.action==='assign')admin(m);else if(b.action==='save'||b.action==='submit'){if(!p.canWrite)fail('Hanya Admin atau PPS yang ditugaskan boleh mengisi skor ini.',403);}else if(['verify','return','reopen'].includes(b.action)){if(!isPGB(d,m)||[r.assigneeId,...(r.pssIds??[])].some(id=>assignedTo(d,id,m.id))||(r as unknown as Row).lastEditorId===m.id)fail('Hanya PGB boleh menyemak borang yang diisi oleh orang lain.',403);}else fail('Tindakan modul tidak sah.');
@@ -116,7 +117,7 @@ function unitCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
    if(old&&['submitted','verified'].includes(old.status??'draft')&&(old.name!==input.name.trim()||JSON.stringify(old.memberIds)!==JSON.stringify(input.memberIds)))fail('Buka semula unit sebelum menukar penugasan.',409);
    return {...(old??{percent:null,notes:'',url:'',data:emptyManagementData(),status:'draft' as const}),id:input.id,name:input.name.trim(),memberIds:input.memberIds};
   });
-  if(rows.some(row=>!ids.has(row.id)))fail('Unit sedia ada tidak boleh dipadam melalui penugasan.');
+  if(rows.some(row=>!ids.has(row.id)&&['submitted','verified'].includes(row.status??'draft')))fail('Buka semula unit sebelum memadamnya.',409);
   r.data.rows=next;
  }else if(b.action==='save'){
   if(typeof b.mutationId!=='string'||!/^[a-f0-9-]{16,80}$/i.test(b.mutationId))fail('Pengecam simpanan tidak sah.');
@@ -149,4 +150,23 @@ function unitCommand(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
  r.status=unitStatus(r);r.revision++;r.updatedAt=now();r.updatedBy=m.id;
  const store=d as Store;store.management??={};store.management[String(year)]??={};store.management[String(year)][aspect]=r;
  audit(d,m,'management_'+b.action,aspect+':'+year,before,r);return managementView(d,m,year);
+}
+
+function sharedSubjects(d:SchoolDoc,m:Row,b:Row):ManagementBundle{
+ admin(m);const source=record(d as Store,b.aspect,b.year);
+ if(!Number.isInteger(b.revision)||b.revision!==source.revision)fail('Tetapan mata pelajaran telah berubah. Muat semula.',409);
+ if(!Array.isArray(b.rows))fail('Senarai mata pelajaran tidak sah.');
+ const copy=structuredClone(d),key=(name:unknown)=>typeof name==='string'?name.trim().toLocaleUpperCase('ms-MY'):'';
+ // Only assignment fields are shared. Each standard retains its own scores, evidence, IDs and locks.
+ for(const aspect of SUBJECT_STANDARDS){
+  const target=record(copy as Store,aspect,b.year),oldRows=target.data.rows??[];
+  const rows=b.rows.map((input:Row)=>{
+   const sourceOld=source.data.rows?.find(row=>row.id===input.id);
+   const old=aspect===b.aspect?oldRows.find(row=>row.id===input.id):oldRows.find(row=>sourceOld&&key(row.name)===key(sourceOld.name))??oldRows.find(row=>key(row.name)===key(input.name??''));
+   return {id:old?.id??input.id,name:input.name,memberIds:input.memberIds};
+  });
+  unitCommand(copy,m,{...b,aspect,revision:target.revision,rows});
+ }
+ (d as Store).management=(copy as Store).management;d.audit=copy.audit;
+ return managementView(d,m,b.year);
 }
