@@ -35,7 +35,7 @@ export function ppdApi(db:any,signIn:(uid:string,pw:string)=>Promise<Row>,auth:(
   fail('Akaun PPD hanya untuk pemantauan.',403);
  }
  async function route(req:Request,b:Row){
-  const a=await requirePPD(req,b);const v=b.body||{};if(b.method!=='GET'&&!(b.method==='POST'&&v.action==='load'))fail('Akaun PPD tidak boleh mengubah data sekolah.',403);
+  const a=await requirePPD(req,b);const v=b.body||{};if(v.action==='status'){await limit('ppd-read:'+a.id,120,600);return (await import('./filling-status.ts')).platformFillingStatus(db,v);}if(b.method!=='GET'&&!(b.method==='POST'&&v.action==='load'))fail('Akaun PPD tidak boleh mengubah data sekolah.',403);
   const current=new Date().getUTCFullYear(),year=v.year??current;if(!Number.isInteger(year)||year<2020||year>2100)fail('Pilih tahun antara 2020–2100.');await limit('ppd-read:'+a.id,120,600);
   const rows:Row[]=[];for(let start=0;;start+=100){const r=await db.from('s4_schools').select('id,code,enabled,data').order('id').range(start,start+99);if(r.error)fail('Pemantauan sekolah belum tersedia. Cuba muat semula.',503);rows.push(...r.data);if(r.data.length<100)break;}
   // Raw school documents stay on the server. Only counts/statuses and school

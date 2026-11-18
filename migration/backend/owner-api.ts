@@ -44,6 +44,7 @@ export function ownerApi(db:any,signIn:(uid:string,pw:string)=>Promise<Row>,auth
  }
  async function route(req:Request,b:Row){
   const o=await requireOwner(req,b);await limit('owner-read:'+o.id,120,600);const v=b.body||{};
+  if(v.action==='status')return (await import('./filling-status.ts')).platformFillingStatus(db,v);
   if(b.method==='GET'){
    const {data,error}=await db.from('s4_schools').select('id,code,enabled,revision,updated_at,school:data->school,members:data->members,teachers:data->teachers,assessments:data->assessments,audit:data->audit').order('code');if(error)fail('Senarai sekolah belum tersedia.',503);
    const receipts=await db.from('s4_owner_deletions').select('id,school_code,created_at,pending_auth').eq('actor_id',o.id).order('created_at',{ascending:false}).limit(100);if(receipts.error)fail('Sejarah pemadaman belum tersedia.',503);

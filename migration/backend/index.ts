@@ -1,3 +1,4 @@
+import {memberFillingStatus} from './filling-status.ts';
 import {ppdApi} from './ppd-api.ts';
 import {ownerApi} from './owner-api.ts';
 import {achievementCommand,achievementView} from './achievement-api.ts';
@@ -106,6 +107,7 @@ Deno.serve(async(req:Request)=>{
     if(b!.method!=='POST')fail('Gunakan POST.',405);await limit('write:'+m.id,300,600);const result=achievementCommand(row.data,m,b!.body||{});await commit(row);return reply(result);
    }
    if(b!.path==='/api/management'){
+    if(b!.body?.action==='status')return reply(memberFillingStatus(row.data,m,b!.body.year));
     if(b!.body?.action==='load')return reply(managementView(row.data,m,b!.body.year));
     if(b!.method!=='POST')fail('Gunakan POST.',405);await limit('write:'+m.id,300,600);const result=managementCommand(row.data,m,b!.body||{});await commit(row);return reply(result);
    }

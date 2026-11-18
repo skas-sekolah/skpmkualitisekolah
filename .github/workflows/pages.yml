@@ -43,6 +43,7 @@ jobs:
       - run: node scripts/test-owner-deletion.mjs
       - run: node scripts/test-my-tasks.mjs
       - run: node scripts/test-school-registration.mjs
+      - run: node scripts/test-filling-status.mjs
       - run: node scripts/test-progress.mjs
       - run: node scripts/test-assignment-roster.mjs
       - run: node scripts/test-teacher-roster-reports.mjs
