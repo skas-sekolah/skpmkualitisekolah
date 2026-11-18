@@ -27,3 +27,22 @@ export function pdpcEvidenceCode(name:string,stage:string){
  if(!suffix[stage])throw Error('Jenis penilaian tidak sah.');
  return prefix+suffix[stage];
 }
+
+const uploadTypes:Record<string,string>={
+ 'application/pdf':'pdf','image/jpeg':'jpg','image/jpg':'jpg','image/png':'png','image/webp':'webp',
+ 'application/msword':'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx',
+ 'application/vnd.ms-excel':'xls','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'xlsx',
+ 'application/vnd.ms-powerpoint':'ppt','application/vnd.openxmlformats-officedocument.presentationml.presentation':'pptx',
+ 'text/plain':'txt','text/csv':'csv','application/csv':'csv',
+ 'application/vnd.oasis.opendocument.text':'odt','application/vnd.oasis.opendocument.spreadsheet':'ods','application/vnd.oasis.opendocument.presentation':'odp'
+};
+export function evidenceUploadExtension(file:{name:string;type:string;size:number},method?:string){
+ const max=method==='apps-script'?5:20;
+ if(file.size<1)throw Error('Fail "'+file.name+'" kosong atau belum dapat dibaca daripada Google Drive. Muat turun fail ke peranti dan pilih semula.');
+ if(file.size>max*1024*1024)throw Error('Fail "'+file.name+'" melebihi had '+max+' MB'+(method==='apps-script'?' untuk sambungan Apps Script':'')+'.');
+ const suffix=/\.([a-z0-9]+)$/i.exec(file.name.trim())?.[1].toLowerCase();
+ if(suffix&&['pdf','jpg','jpeg','png','webp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','odt','ods','odp'].includes(suffix))return suffix;
+ const mime=file.type.toLowerCase().split(';')[0].trim();
+ if(uploadTypes[mime])return uploadTypes[mime];
+ throw Error('Jenis fail "'+file.name+'" tidak dapat dikenal pasti. Gunakan PDF, JPG, PNG atau dokumen pejabat; pastikan nama mempunyai sambungan seperti .pdf atau .jpg.');
+}
