@@ -25,3 +25,13 @@ assert.equal(F.evidenceUploadExtension({name:'besar.pdf',type:'application/pdf',
 assert.throws(()=>F.evidenceUploadExtension({name:'besar.pdf',type:'application/pdf',size:21*1024*1024},'google'),/20 MB/);
 assert.throws(()=>F.evidenceUploadExtension({name:'unknown',type:'application/octet-stream',size:12}),/Jenis fail/);
 console.log('PASS Drive/provider filenames: extensionless PDF/images/Word, dotted titles, MIME parameters, uppercase extensions, preserved uploads, distinct empty/type/size errors and connection-specific limits.');
+
+for(const [bytes,ext]of [[Buffer.from('%PDF-1.7\n'),'pdf'],[Buffer.from([255,216,255,224]),'jpg'],[Buffer.from([137,80,78,71,13,10,26,10]),'png'],[Buffer.concat([Buffer.from([208,207,17,224,161,177,26,225]),Buffer.from('WordDocument\0','utf16le')]),'doc']]){
+ const f=await D.prepareEvidenceFile(new File([bytes],'Takwim Puteri Islam',{type:'application/octet-stream'}),'apps-script');assert.ok(f.name.endsWith('.'+ext));assert.deepEqual(Buffer.from(await f.arrayBuffer()),bytes);
+}
+function zipDirectory(names){return Buffer.concat([Buffer.from([80,75,3,4]),...names.map(name=>{const entry=Buffer.alloc(46);entry.writeUInt32LE(0x02014b50);entry.writeUInt16LE(Buffer.byteLength(name),28);return Buffer.concat([entry,Buffer.from(name)]);})]);}
+for(const [part,ext]of [['word/document.xml','docx'],['xl/workbook.xml','xlsx'],['ppt/presentation.xml','pptx']]){const f=await D.prepareEvidenceFile(new File([zipDirectory(['[Content_Types].xml',part])],'Dokumen',{type:''}));assert.ok(f.name.endsWith('.'+ext));}
+await assert.rejects(()=>D.prepareEvidenceFile(new File([zipDirectory(['random.txt'])],'unknown')),/Jenis fail/);
+await assert.rejects(()=>D.prepareEvidenceFile(new File(['unsupported'],'unknown')),/Jenis fail/);
+await assert.rejects(()=>D.prepareEvidenceFile(new File([Buffer.alloc(6*1024*1024)],'unknown'),'apps-script'),/5 MB/);
+console.log('PASS content fallback: extensionless generic-MIME PDF/JPEG/PNG/legacy Word and Office ZIP directory markers, exact bytes preserved, unknown files and oversize rejected.');
