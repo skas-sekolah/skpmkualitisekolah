@@ -22,3 +22,14 @@ d.strength[2026].A1.revision++;assert.equal((await call(d,pgb,body)).current,fal
 view=await call(d,pgb,body);await call(d,pgb,{...body,action:'final-attest',confirmed:true,fingerprint:view.fingerprint,revision:view.revision});d.assessments[0].status='draft';assert.equal((await call(d,pgb,body)).ready,false);assert.equal((await call(d,pgb,body)).current,false);
 pgb.active=0;await assert.rejects(()=>call(d,pgb,body),e=>e.status===403);
 console.log('PASS school final attestation: PGB-only, active membership, all modules submitted without individual verification, completeness, confirmation, stale/duplicate conflicts, invalidation after changes, audit and no source-score mutations.');
+
+// Module verification is independent of all other modules and updates statuses atomically.
+pgb.active=1;d.management[2026]['1.1.1'].status='draft';d.achievement[2026]['5.1.1'].status='draft';
+const moduleBody={action:'final-load',year:2026,module:'strength'};
+let moduleView=await call(d,pgb,moduleBody);assert.equal(moduleView.ready,true);assert.equal(moduleView.rows.length,9);assert.ok(moduleView.rows.every(r=>r.module==='Kekuatan Kami'));
+const beforeData=JSON.stringify(Object.values(d.strength[2026]).map(r=>r.data)),otherBefore=JSON.stringify(d.management);
+moduleView=await call(d,pgb,{...moduleBody,action:'final-attest',fingerprint:moduleView.fingerprint,revision:moduleView.revision,confirmed:true});assert.equal(moduleView.current,true);assert.ok(Object.values(d.strength[2026]).every(r=>r.status==='verified'&&r.verifiedBy===pgb.id));assert.equal(JSON.stringify(Object.values(d.strength[2026]).map(r=>r.data)),beforeData);assert.equal(JSON.stringify(d.management),otherBefore);
+d.achievement[2026]['5.1.1'].revision++;assert.equal((await call(d,pgb,moduleBody)).current,true);d.strength[2026].A1.revision++;assert.equal((await call(d,pgb,moduleBody)).current,false);
+// Existing prohibition on certifying one's own entered scores also applies to a batch.
+d.strength[2026].A1.status='submitted';d.strength[2026].A1.lastEditorId=pgb.id;const atomic=JSON.stringify(d.strength);moduleView=await call(d,pgb,moduleBody);assert.equal(moduleView.ready,false);await assert.rejects(()=>call(d,pgb,{...moduleBody,action:'final-attest',confirmed:true,fingerprint:moduleView.fingerprint,revision:moduleView.revision}),e=>e.status===409);assert.equal(JSON.stringify(d.strength),atomic);
+console.log('PASS independent module verification: all A1–A9 in one batch, unrelated incomplete modules allowed, status updates, preserved values/other modules, isolated invalidation and no self-verification.');
