@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "SK@S \u2014 Pemindahan Skor MOEIS",
-  "version": "0.2.0",
+  "name": "SK@S — Pemindahan Skor MOEIS",
+  "version": "0.3.0",
   "minimum_chrome_version": "102",
-  "description": "Kutip semua 38 item dan semua guru dalam sesi MOEIS secara automatik; hantar ke pratonton SK@S.",
+  "description": "Ambil skor Standard 4 dan snapshot skor wajaran Kekuatan Kami A1–A9 ke pratonton SK@S.",
   "permissions": [
     "activeTab",
     "scripting",

@@ -5,7 +5,7 @@ function permissions(d:SchoolDoc,m:Row,r:StrengthRecord){const canAdmin=m.role==
 function record(d:Store,aspect:AspectId,year:number):StrengthRecord{return structuredClone(d.strength?.[String(year)]?.[aspect]??emptyStrengthRecord(aspect,year));}
 export function strengthView(d:SchoolDoc,m:Row,year:number):StrengthBundle{
  if(!validYear(year))fail('Pilih tahun antara 2020–2100.');
- return {year,records:ASPECTS.map(a=>{const r=record(d,a.id,year),p=permissions(d,m,r),hasEntry=scoreEntry(r.data);if(!p.canRead){r.data=emptyStrengthRecord(a.id,year).data;r.feedback='';}delete r.lastMutationId;delete r.lastMutationActor;return {...r,...p,hasEntry};}),people:assignmentPeople(d,year),school:{code:d.school.code,name:d.school.name},sessionId:m.id};
+ return {year,records:ASPECTS.map(a=>{const r=record(d,a.id,year);r.moeis=(d as any).moeisStrength?.[String(year)]?.find((s:any)=>s.aspect===a.id);const p=permissions(d,m,r),hasEntry=scoreEntry(r.data);if(!p.canRead){delete r.moeis;r.data=emptyStrengthRecord(a.id,year).data;r.feedback='';}delete r.lastMutationId;delete r.lastMutationActor;return {...r,...p,hasEntry};}),people:assignmentPeople(d,year),school:{code:d.school.code,name:d.school.name},sessionId:m.id};
 }
 export function strengthCommand(d:SchoolDoc,m:Row,b:Row):StrengthBundle{
  if(b.action==='reset-all'){

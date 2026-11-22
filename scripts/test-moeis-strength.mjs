@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {compile,read,domain,scoring,strength,fixture} from './achievement-fixtures.mjs';
+const M=await import(strength),API=await import(compile(read('migration/backend/transfer-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./scoring.ts'",JSON.stringify(scoring)).replace("'./strength-model.ts'",JSON.stringify(strength))));
+const S=await import(compile(read('migration/backend/strength-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./strength-model.ts'",JSON.stringify(strength))));
+const row={aspect:'A1',schoolCode:'UJI-STD5',year:2026,capturedAt:'2026-11-22T12:00:00.000Z',score:9.42,criteria:[{label:'ABM',score:2,fields:[{label:'Sedia ada',value:142},{label:'ABM',value:141}]},{label:'Opsyen',score:2,fields:[{label:'Opsyen',value:139},{label:'ABM',value:142}]},{label:'Kepakaran',score:2.93,fields:[{label:'Jumlah guru',value:141},{label:'Pakar',value:138}]},{label:'Strategik',score:2.49,fields:[{label:'Berpengalaman',value:53},{label:'Strategik',value:44}]}]};
+assert.deepEqual(M.cleanMoeisStrength([row]),[row]);assert.equal(M.cleanMoeisStrength([{...row,aspect:'A8',score:0,criteria:[]}])[0].score,0);
+for(const bad of [[row,row],[{...row,score:9.99}],[{...row,criteria:[]}],[{...row,score:NaN}],[{...row,criteria:[{label:'bad',score:2,fields:[{label:'bad',value:-1}]}]}]])assert.throws(()=>M.cleanMoeisStrength(bad));
+const d=fixture(),admin=d.members[0],body={action:'transfer-import',module:'strength',schoolCode:d.school.code,year:2026,rows:[row],revision:0};
+const initial=structuredClone(d);assert.throws(()=>API.transferImport(d,d.members[4],body),e=>e.status===403);assert.deepEqual(d,initial);
+assert.throws(()=>API.transferImport(d,admin,{...body,schoolCode:'FOREIGN'}),e=>e.status===403);
+assert.equal(API.transferImport(d,admin,body).saved,1);assert.equal(d.strength,undefined);assert.deepEqual(d.assessments,[]);assert.equal(API.transferView(d,admin,2026).moeisStrength[0].score,9.42);
+assert.equal(S.strengthView(d,admin,2026).records[0].moeis.score,9.42);assert.equal(S.strengthView(d,d.members[4],2026).records[0].moeis,undefined);
+assert.throws(()=>API.transferImport(d,admin,body),e=>e.status===409);assert.throws(()=>API.transferImport(d,admin,{...body,revision:1}),e=>e.status===409);
+assert.equal(API.transferImport(d,admin,{...body,revision:1,replace:true}).saved,1);
+console.log('PASS MOEIS strength snapshot: A1 original scores / denominators, zero, validation, no inferred formula, admin access, private view, revision conflicts, explicit replacement and preservation of SKAS entries.');

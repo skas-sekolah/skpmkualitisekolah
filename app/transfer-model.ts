@@ -1,6 +1,6 @@
 import {rubric,stages,stageNames,normalized,type Stage,type TeacherType} from './scoring';
 export type TransferRecord={teacherId:string;teacherName:string;schoolCode:string;year:number;stage:Stage|'';type:TeacherType|'';scores:(number|null)[];date:string;subject:string;classroom:string};
-export type TransferBundle={school:{id:string;code:string;name:string};year:number;epoch:string;teachers:{id:string;name:string;type:TeacherType;canImport:Stage[]}[];assessments:import('./scoring').Assessment[]};
+export type TransferBundle={moeisStrength?:import('../migration/backend/strength-model').MoeisStrengthSnapshot[];moeisStrengthRevision?:number;school:{id:string;code:string;name:string};year:number;epoch:string;teachers:{id:string;name:string;type:TeacherType;canImport:Stage[]}[];assessments:import('./scoring').Assessment[]};
 export type TransferPreview={file:string;record:TransferRecord;errors:string[];warnings:string[];existingRevision:number;existingId:string;replace:boolean;selected:boolean};
 export const TRANSFER_ITEMS=rubric.perdana.groups.flatMap(g=>g.items.map((_,i)=>({code:g.code,item:String.fromCharCode(97+i)})));
 export function cleanStage(value:string):Stage|''{const v=normalized(value).replace(/[_-]+/g,' ');return /^(KENDIRI|PENILAIAN KENDIRI)$/.test(v)?'kendiri':/^(PERTAMA|PENCERAPAN 1|PENCERAPAN PERTAMA|CERAPAN 1)$/.test(v)?'pertama':/^(KEDUA|PENCERAPAN 2|PENCERAPAN KEDUA|CERAPAN 2)$/.test(v)?'kedua':'';}

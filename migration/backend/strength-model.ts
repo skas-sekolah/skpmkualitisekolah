@@ -17,7 +17,7 @@ export const STATUS_NAMES:Record<StrengthStatus,string>={draft:'Draf',submitted:
 export type InventoryRow={id:string;name:string;existing:number|null;working:number|null};
 export type ParentProgram={id:string;name:string;held:boolean;attendance:number|null;parents:number|null};
 export type StrengthData={values:Record<string,number|null>;rows:InventoryRow[];programs:ParentProgram[];none:boolean;applicable:boolean;notes:string;evidence:string[]};
-export type StrengthRecord={aspect:AspectId;year:number;revision:number;status:StrengthStatus;assigneeId:string|null;reviewerId:string|null;data:StrengthData;canRead:boolean;canEdit:boolean;canReview:boolean;canReopen?:boolean;updatedAt:string|null;updatedBy:string|null;submittedAt:string|null;verifiedAt:string|null;verifiedBy:string|null;verifiedName?:string|null;feedback:string;lastMutationId?:string;lastMutationActor?:string};
+export type StrengthRecord={moeis?:MoeisStrengthSnapshot;aspect:AspectId;year:number;revision:number;status:StrengthStatus;assigneeId:string|null;reviewerId:string|null;data:StrengthData;canRead:boolean;canEdit:boolean;canReview:boolean;canReopen?:boolean;updatedAt:string|null;updatedBy:string|null;submittedAt:string|null;verifiedAt:string|null;verifiedBy:string|null;verifiedName?:string|null;feedback:string;lastMutationId?:string;lastMutationActor?:string};
 export type StrengthBundle={year:number;records:StrengthRecord[];people:{id:string;name:string}[];school:{code:string;name:string};sessionId:string};
 export type PendingStrength={year:number;aspect:AspectId;revision:number;data:StrengthData;mutationId:string;error?:string};
 export type FieldSpec={key:string;label:string;percent?:boolean};
@@ -399,3 +399,23 @@ export const CATALOG:Partial<Record<AspectId,string[]>>={
   "Tandas Murid Perempuan (Asrama)"
  ]
 };
+
+// Imported display values are a dated MOEIS snapshot, never a locally inferred formula.
+export type MoeisStrengthSnapshot={aspect:AspectId;schoolCode:string;year:number;capturedAt:string;score:number;criteria:{label:string;score:number;fields:{label:string;value:number|null}[]}[]};
+export function cleanMoeisStrength(input:unknown):MoeisStrengthSnapshot[]{
+ if(!Array.isArray(input)||!input.length||input.length>9)throw Error('Import memerlukan 1–9 aspek.');
+ if(JSON.stringify(input).length>900000)throw Error('Saiz kutipan terlalu besar.');
+ const seen=new Set<string>();
+ const score=(v:unknown)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>100||Math.abs(v*100-Math.round(v*100))>0.000001)throw Error('Skor MOEIS tidak sah.');return v;};
+ const text=(v:unknown,max:number)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw Error('Label MOEIS tidak sah.');return v.trim();};
+ return input.map((raw:any)=>{
+  if(!raw||!validAspect(raw.aspect)||seen.has(raw.aspect))throw Error('Aspek MOEIS tidak sah / berulang.');seen.add(raw.aspect);
+  if(!validYear(raw.year)||typeof raw.schoolCode!=='string'||!/^[A-Z0-9][A-Z0-9-]{2,15}$/.test(raw.schoolCode))throw Error('Sekolah / tahun MOEIS tidak sah.');
+  if(typeof raw.capturedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T/.test(raw.capturedAt)||!Number.isFinite(Date.parse(raw.capturedAt))||raw.capturedAt.length>30)throw Error('Tarikh kutipan tidak sah.');
+  if(!Array.isArray(raw.criteria)||raw.criteria.length>30)throw Error('Kriteria MOEIS tidak sah.');
+  const criteria=raw.criteria.map((c:any)=>{if(!c||!Array.isArray(c.fields)||c.fields.length>300)throw Error('Medan MOEIS tidak sah.');return {label:text(c.label,1000),score:score(c.score),fields:c.fields.map((f:any)=>{if(!f||f.value!==null&&(typeof f.value!=='number'||!Number.isFinite(f.value)||f.value<0||f.value>1000000))throw Error('Bilangan MOEIS tidak sah.');return {label:text(f.label,500),value:f.value};})};});
+  if(!criteria.length&&(raw.aspect!=='A8'||raw.score!==0))throw Error('Butiran kriteria diperlukan.');
+  if(criteria.length&&Math.abs(criteria.reduce((n:number,c:any)=>n+c.score,0)-raw.score)>0.021)throw Error('Jumlah skor kriteria tidak sepadan.');
+  return {aspect:raw.aspect,schoolCode:raw.schoolCode,year:raw.year,capturedAt:raw.capturedAt,score:score(raw.score),criteria};
+ });
+}

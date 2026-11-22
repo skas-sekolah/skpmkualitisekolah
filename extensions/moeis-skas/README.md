@@ -64,3 +64,18 @@ Untuk buang: buka chrome://extensions → Remove. Untuk kemas kini: gantikan fol
 
 ## Pembangun
 `node tests/core.test.cjs` dan `node tests/adapter.test.cjs` dari folder ini. Sumber bebas binaan, tiada pergantungan luaran. Ini alat SK@S, bukan produk rasmi KPM.
+
+
+## 0.3.0 — Kekuatan Kami automatik (percubaan)
+
+1. Muat semula extension selepas menggantikan fail; manifest.json mesti berada pada aras folder yang dipilih.
+2. Log masuk MOEIS, buka satu aspek Kekuatan Kami yang telah disimpan. Isi kod sekolah dan tahun dalam extension. Semak kod sekolah sendiri dengan sekolah dalam MOEIS.
+3. Tekan **Ambil semua skor wajaran A1–A9**. Kekalkan tab terbuka sehingga 9 aspek selesai.
+4. Buka SK@S sebagai Admin / Superadmin → Pengurusan Admin → Muat Naik dan Muat Turun SK@S. Tekan **Hantar wajaran ke pratonton SK@S**, semak dan simpan.
+5. Pilihan fail JSON tersedia jika pemindahan terus gagal; fail boleh dimuat naik pada panel Kekuatan Kami di pusat import yang sama.
+
+Penerima dan backend SK@S versi baharu mesti diterbitkan dahulu. Versi laman lama tidak menerima data wajaran. Fail ini tidak mengandungi kata laluan atau data sekolah.
+
+Bacaan GET sahaja daripada pautan aspek di MOEIS; tiada Simpan/Hantar MOEIS ditekan. Mengambil skor yang dipaparkan dan bilangan asal, termasuk pembahagi berasingan, bukan meneka formula wajaran. Perubahan MOEIS yang belum disimpan tidak dikutip. Import menyimpan snapshot berasingan; tidak mengubah pengisian, penugasan, evidens atau pengesahan SK@S. Snapshot boleh menjadi lapuk selepas data MOEIS berubah; ambil semula untuk kemas kini.
+
+Ujian automatik menggunakan struktur DOM simulasi berdasarkan paparan A1; keseluruhan A1–A9 belum diuji pada sesi MOEIS sebenar. Jika struktur/pautan/skor tidak jelas, kutipan berhenti dan hantaran dikunci; jangan anggap gagal baca sebagai skor sifar.

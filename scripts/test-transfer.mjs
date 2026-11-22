@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import {compile,read,scoring,domain,fixture} from './achievement-fixtures.mjs';
+import {compile,read,scoring,domain,fixture,strength} from './achievement-fixtures.mjs';
 const modelURL=compile(read('app/transfer-model.ts').replace("'./scoring'",JSON.stringify(scoring)));
 const M=await import(modelURL),S=await import(scoring),D=await import(domain);
-const API=await import(compile(read('migration/backend/transfer-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./scoring.ts'",JSON.stringify(scoring))));
+const API=await import(compile(read('migration/backend/transfer-api.ts').replace("'./domain.ts'",JSON.stringify(domain)).replace("'./scoring.ts'",JSON.stringify(scoring)).replace("'./strength-model.ts'",JSON.stringify(strength))));
 const teacher={id:'fictional-teacher',name:'GURU UJIAN',type:'perdana',position:'GAB'},bundle={school:{id:'fixture-school',code:'UJI-STD5',name:'Fictional'},year:2026,epoch:'test-epoch',teachers:[{...teacher,canImport:['kendiri']}],assessments:[]};
 const record={...M.emptyTransfer(),teacherId:teacher.id,teacherName:teacher.name,schoolCode:bundle.school.code,year:2026,stage:'kendiri',type:'perdana',scores:Array.from({length:38},(_,i)=>i%5),date:'2026-11-22',subject:'Matematik',classroom:'4 Ujian'};
 assert.equal(M.TRANSFER_ITEMS.length,38);

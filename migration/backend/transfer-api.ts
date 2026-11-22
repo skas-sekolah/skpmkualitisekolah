@@ -1,12 +1,25 @@
+import {cleanMoeisStrength,type MoeisStrengthSnapshot} from './strength-model.ts';
 import {admin,fail,getData,mayWrite,dataCommand,audit,type SchoolDoc,type Row} from './domain.ts';
 import {stages,rosterActive} from './scoring.ts';
 export function transferView(d:SchoolDoc,m:Row,year:number){
  admin(m);if(!Number.isInteger(year)||year<2020||year>2100)fail('Tahun tidak sah.');
- const view=getData(d,m);return {school:{id:d.school.id,code:d.school.code,name:d.school.name},year,epoch:d.pdpc?.epoch??'',teachers:d.teachers.filter(t=>rosterActive(t,year)).map(t=>({id:t.id,name:t.name,type:t.type,canImport:stages.filter(s=>mayWrite(d,m,t,s,year))})),assessments:view.assessments.filter(a=>a.year===year&&(!d.pdpc?.epoch||a.epoch===d.pdpc.epoch))};
+ const view=getData(d,m);return {moeisStrength:((d as any).moeisStrength?.[String(year)]??[]) as MoeisStrengthSnapshot[],moeisStrengthRevision:(d as any).moeisStrengthRevision?.[String(year)]??0,school:{id:d.school.id,code:d.school.code,name:d.school.name},year,epoch:d.pdpc?.epoch??'',teachers:d.teachers.filter(t=>rosterActive(t,year)).map(t=>({id:t.id,name:t.name,type:t.type,canImport:stages.filter(s=>mayWrite(d,m,t,s,year))})),assessments:view.assessments.filter(a=>a.year===year&&(!d.pdpc?.epoch||a.epoch===d.pdpc.epoch))};
 }
 export function transferImport(d:SchoolDoc,m:Row,b:Row){
  admin(m);if(!Number.isInteger(b.year)||b.year<2020||b.year>2100)fail('Tahun tidak sah.');
  if(b.schoolCode!==d.school.code)fail('Kod sekolah import tidak sepadan.',403);
+ if(b.module==='strength'){
+  let rows:MoeisStrengthSnapshot[];try{rows=cleanMoeisStrength(b.rows);}catch(e){fail((e as Error).message);}
+  if(rows!.some(r=>r.schoolCode!==d.school.code||r.year!==b.year))fail('Sekolah / tahun kutipan tidak sepadan.',403);
+  const store=d as any,revision=store.moeisStrengthRevision?.[String(b.year)]??0;
+  if(b.revision!==revision)fail('Import MOEIS telah berubah. Muat semula pratonton.',409);
+  const old=store.moeisStrength?.[String(b.year)]??[];
+  if(old.length&&b.replace!==true)fail('Sahkan penggantian snapshot MOEIS.',409);
+  const next=[...old.filter((r:MoeisStrengthSnapshot)=>!rows!.some(n=>n.aspect===r.aspect)),...rows!].sort((a,b)=>a.aspect.localeCompare(b.aspect));
+  store.moeisStrength??={};store.moeisStrengthRevision??={};store.moeisStrength[String(b.year)]=next;store.moeisStrengthRevision[String(b.year)]=revision+1;
+  audit(d,m,'strength_moeis_import',String(b.year),old,next);
+  return {saved:rows!.length,...transferView(d,m,b.year)};
+ }
  if((d.pdpc?.epoch??'')!==b.epoch)fail('Tetapan penilaian telah berubah. Muat semula pratonton.',409);
  if(!Array.isArray(b.rows)||!b.rows.length||b.rows.length>50)fail('Pilih antara 1 hingga 50 rekod untuk import.');
  const draft=structuredClone(d),keys=new Set<string>(),saved:string[]=[];
