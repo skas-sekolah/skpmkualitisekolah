@@ -51,6 +51,8 @@ jobs:
       - run: node scripts/test-school-registration.mjs
       - run: node scripts/test-filling-status.mjs
       - run: node scripts/test-filling-table.mjs
+      - run: node scripts/test-table-sort.mjs
+      - run: node scripts/test-sortable-table.mjs
       - run: node scripts/test-progress.mjs
       - run: node scripts/test-assignment-roster.mjs
       - run: node scripts/test-teacher-roster-reports.mjs

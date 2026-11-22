@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {compile,read} from './achievement-fixtures.mjs';
+const M=await import(compile(read('app/table-sort.ts')));
+const sort=(xs,h='Nama',d='asc')=>M.stableTableSort(xs,x=>x,h,d);
+assert.deepEqual(sort(['Unit 10','Unit 2','Unit 1']),['Unit 1','Unit 2','Unit 10']);
+assert.deepEqual(sort(['10','2','0','—']),['0','2','10','—']);
+assert.deepEqual(sort(['0','—','10'],'Skor','desc'),['10','0','—']);
+assert.deepEqual(sort(['Selesai','Belum mengisi','Sedang mengisi'],'Status'),['Belum mengisi','Sedang mengisi','Selesai']);
+assert.deepEqual(sort(['1.1.10','1.1.2','1.1.1'],'Standard'),['1.1.1','1.1.2','1.1.10']);
+assert.deepEqual(sort(['2 / 4','0 / 4','4 / 4'],'Kemajuan'),['0 / 4','2 / 4','4 / 4']);
+assert.deepEqual(sort(['22/11/26, 1:18 PTG','22/11/26, 11:52 PG','10/11/26, 11:52 PTG'],'Dikemas kini'),['10/11/26, 11:52 PTG','22/11/26, 11:52 PG','22/11/26, 1:18 PTG']);
+const ties=[{id:1,value:'A'},{id:2,value:'A'}];assert.deepEqual(M.stableTableSort(ties,x=>x.value,'Nama','desc'),ties);
+for(const name of ['filling-status','owner-portal','pdpc-ui','pdpc-reports-ui','teacher-roster-ui','pps-board','transfer-center'])assert.ok(read('app/'+name+'.tsx').includes('<SortableTable'));
+assert.ok(read('app/sortable-table.tsx').includes('aria-sort'));assert.ok(!read('app/sortable-table.tsx').includes('appendChild'));
+console.log('PASS shared table sorting: natural codes, numbers, zero/missing, workflow status, progress, Malay dates, stable ties and module coverage.');
