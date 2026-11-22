@@ -46,6 +46,7 @@ jobs:
       - run: node scripts/test-moeis-strength.mjs
       - run: node scripts/test-school-attestation.mjs
       - run: node scripts/test-module-summary-ui.mjs
+      - run: node scripts/test-pdpc-compact-table.mjs
       - run: node scripts/test-standard4-privacy.mjs
       - run: node scripts/test-moeis-auto.mjs
       - run: node --test extensions/moeis-skas/tests/*.cjs
