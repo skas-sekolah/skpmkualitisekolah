@@ -44,6 +44,7 @@ jobs:
       - run: node scripts/test-owner-deletion.mjs
       - run: node scripts/test-transfer.mjs
       - run: node scripts/test-moeis-strength.mjs
+      - run: node scripts/test-school-attestation.mjs
       - run: node scripts/test-standard4-privacy.mjs
       - run: node scripts/test-moeis-auto.mjs
       - run: node --test extensions/moeis-skas/tests/*.cjs

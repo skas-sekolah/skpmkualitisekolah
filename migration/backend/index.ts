@@ -21,7 +21,7 @@ async function email(uid:string){const {data,error}=await db.auth.admin.getUserB
 async function signIn(uid:string,pw:string){return auth('token?grant_type=password',{email:await email(uid),password:pw});}
 function tokens(t:Row,sid:string,d:SchoolDoc,m:Row){return {accessToken:t.access_token,refreshToken:t.refresh_token,sid,schoolId:d.school.id};}
 async function newSession(row:Row,m:Row,t:Row){const sid=secret();initializePdpc(row.data);row.data.sessions.push({hash:await hash(sid),memberId:m.id,expiresAt:new Date(Date.now()+604800000).toISOString()});await commit(row);return {session:session(row.data,m),tokens:tokens(t,sid,row.data,m)};}
-function isReadOnlySchoolRequest(b:Row){return b.path==='/api/data'&&(b.method==='GET'||b.body?.action==='transfer-load')||['/api/strength','/api/management','/api/achievement','/api/resources'].includes(b.path)&&['load',...(b.path==='/api/management'?['status']:[])].includes(b.body?.action);}
+function isReadOnlySchoolRequest(b:Row){return b.path==='/api/data'&&(b.method==='GET'||b.body?.action==='transfer-load')||['/api/strength','/api/management','/api/achievement','/api/resources'].includes(b.path)&&['load',...(b.path==='/api/management'?['status','final-load']:[])].includes(b.body?.action);}
 async function requireUser(req:Request,b:Row){const readOnly=isReadOnlySchoolRequest(b);const token=req.headers.get('authorization')?.replace(/^Bearer /i,'');if(!token)fail('Sila log masuk dahulu.',401);const {data,error}=await db.auth.getUser(token);if(error||!data.user)fail('Sesi telah tamat. Log masuk semula.',401);if(typeof b.schoolId!=='string'||typeof b.sid!=='string'||!/^[a-f0-9]{64}$/.test(b.sid))fail('Sesi tidak sah.',401);const row=await load(b.schoolId,false,readOnly);if(!row)fail('Akaun tidak ditemui.',401);const m=actor(row.data,data.user.id,await hash(b.sid));if(b.expected&&m.id!==b.expected)fail('Akaun pada pelayar telah berubah. Log masuk semula.',409);if(initializePdpc(row.data)&&!readOnly){await commit(row);row.revision++;}return {row,m,uid:data.user.id,token};}
 const owners=ownerApi(db,signIn,auth,limit);
 const ppd=ppdApi(db,signIn,auth,limit);
@@ -111,6 +111,7 @@ Deno.serve(async(req:Request)=>{
     if(b!.method!=='POST')fail('Gunakan POST.',405);await limit('write:'+m.id,300,600);const result=achievementCommand(row.data,m,b!.body||{});await commit(row);return reply(result);
    }
    if(b!.path==='/api/management'){
+    if(['final-load','final-attest'].includes(b!.body?.action)){if(b!.body.action==='final-attest'&&b!.method!=='POST')fail('Gunakan POST.',405);const {schoolAttestation}=await import('./school-attestation.ts');const result=await schoolAttestation(row.data,m,b!.body);if(b!.body.action==='final-attest'){await limit('write:'+m.id,300,600);await commit(row);}return reply(result);}
     if(b!.body?.action==='status')return reply(memberFillingStatus(row.data,m,b!.body.year));
     if(b!.body?.action==='load')return reply(managementView(row.data,m,b!.body.year));
     if(b!.method!=='POST')fail('Gunakan POST.',405);await limit('write:'+m.id,300,600);const result=managementCommand(row.data,m,b!.body||{});await commit(row);return reply(result);
