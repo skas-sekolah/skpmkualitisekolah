@@ -36,7 +36,7 @@ const db={
    }).then(resolve,reject);}
   };return query;
  },
- async rpc(){return {data:true,error:null};},
+ async rpc(name,args){if(name==='s4_read_school'){const row=clone(rows.get(args.p_id)??null);if(row)row.data.audit=[];return {data:row,error:null};}return {data:true,error:null};},
  auth:{
   async getUser(token){return {data:{user:users.has(token)?{id:token}:null},error:null};},
   admin:{
@@ -80,12 +80,12 @@ try{
  const missing=school('FIX001');await missing.save();const before=clone(rows.get(missing.context.schoolId));
  const invalid=await request({...missing.context,expected:'other-member'});assert.equal(invalid.status,409);assert.deepEqual(rows.get(missing.context.schoolId),before,'Rejected identity cannot initialize a school');
  const foreign=await request({...missing.context,token:t.accessToken});assert.equal(foreign.status,401);assert.deepEqual(rows.get(missing.context.schoolId),before,'Another school cannot initialize this school');
- const repaired=await request(missing.context);assert.equal(repaired.status,200);assert.equal(repaired.data.pdpc.version,2);assert.equal(rows.get(missing.context.schoolId).revision,10);
+ const repaired=await request(missing.context);assert.equal(repaired.status,200);assert.equal(repaired.data.pdpc.version,2);assert.equal(rows.get(missing.context.schoolId).revision,9,'Read projection initializes the response without persisting it');
  const after=clone(rows.get(missing.context.schoolId));delete after.data.pdpc;assert.deepEqual(after.data,before.data,'Recovery preserves roster, marks, members and other modules');
- const assignment=await request({...missing.context,method:'POST',body:{action:'pdpc-assignments',year:2026,revision:0,rows:[{teacherId:'t',observerId:'teacher:o',observer2Id:'teacher:o',reviewerId:'teacher:o'}]}});assert.equal(assignment.status,200,'Recovered settings must accept assignments');assert.equal(rows.get(missing.context.schoolId).revision,11,'Recovery must advance the local CAS revision before a later write');
+ const assignment=await request({...missing.context,method:'POST',body:{action:'pdpc-assignments',year:2026,revision:0,rows:[{teacherId:'t',observerId:'teacher:o',observer2Id:'teacher:o',reviewerId:'teacher:o'}]}});assert.equal(assignment.status,200,'Recovered settings must accept assignments');assert.equal(rows.get(missing.context.schoolId).revision,11,'First write persists initialization and advances CAS before saving assignments');
 
  const concurrent=school('FIX002');await concurrent.save();conflict=true;
- const retry=await request(concurrent.context);assert.equal(retry.status,200);assert.equal(rows.get(concurrent.context.schoolId).data.concurrentChange,'preserved');assert.equal(rows.get(concurrent.context.schoolId).revision,11);
+ const retry=await request(concurrent.context);assert.equal(retry.status,200);assert.equal(rows.get(concurrent.context.schoolId).revision,9,'Read-only requests do not write or consume a CAS conflict');conflict=false;
  const login=school('FIX003');await login.save();
  const signedIn=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}});assert.equal(signedIn.status,200);assert.equal(rows.get(login.context.schoolId).data.pdpc.version,2);
 
@@ -94,6 +94,12 @@ try{
  const existing=school('FIX004',{pdpc:{version:2,epoch:'existing',revision:7,assignments:{2026:[{teacherId:'t',observerId:'teacher:o',reviewerId:'teacher:o'}]}},assessments:[{id:'existing-record',teacherId:'t',year:2026,stage:'pertama',epoch:'existing',total:'88.00',status:'verified'}]});await existing.save();const preserved=clone(rows.get(existing.context.schoolId));assert.equal((await request(existing.context)).status,200);assert.deepEqual(rows.get(existing.context.schoolId),preserved);
  const legacy=school('FIX005',{assessments:[{id:'legacy-record',teacherId:'t',year:2026,total:'72.00'}]});await legacy.save();const legacyBefore=clone(rows.get(legacy.context.schoolId));assert.equal((await request(legacy.context)).status,200);assert.deepEqual(rows.get(legacy.context.schoolId),legacyBefore,'Legacy assessments require an explicit migration; never reset them during login');
  const archived=school('FIX006');await archived.save();rows.get(archived.context.schoolId).enabled=false;const archivedBefore=clone(rows.get(archived.context.schoolId));assert.equal((await request(archived.context)).status,423);assert.deepEqual(rows.get(archived.context.schoolId),archivedBefore);
+ // Exercise the actual Admin API paths used by the transfer page.
+ const transfer=await request({...existing.context,method:'POST',body:{action:'transfer-load',year:2026}});assert.equal(transfer.status,200);assert.equal(transfer.data.school.code,'FIX004');assert.deepEqual(transfer.data.teachers.find(t=>t.id==='t').canImport,['kendiri']);
+ const importBody={action:'transfer-import',schoolCode:'FIX004',epoch:'existing',year:2026,rows:[{teacherId:'t',teacherName:'Guru Rekaan',type:'perdana',stage:'kendiri',scores:Array(38).fill(0),revision:0,replace:false,date:'',subject:'',classroom:''}]};
+ assert.equal((await request({...existing.context,method:'GET',body:importBody})).status,405);
+ const imported=await request({...existing.context,method:'POST',body:importBody});assert.equal(imported.status,200);assert.equal(imported.data.saved,1);assert.equal(imported.data.assessments.find(a=>a.stage==='kendiri').total,'0.00');
+ assert.equal((await request({...existing.context,method:'POST',body:importBody})).status,409);assert.equal((await request({...existing.context,expected:'foreign',method:'POST',body:{action:'transfer-load',year:2026}})).status,409);
  assert.ok(writes>0);
  console.log('PASS school registration and recovery: initial config, active-session/login recovery, assignment save, idempotency, CAS retry, school isolation, rejected/disabled access, existing settings/marks and legacy preservation.');
 }finally{globalThis.fetch=oldFetch;delete globalThis.Deno;delete globalThis.__schoolTestDB;}

@@ -45,6 +45,19 @@ export function ownerApi(db:any,signIn:(uid:string,pw:string)=>Promise<Row>,auth
  async function route(req:Request,b:Row){
   const o=await requireOwner(req,b);await limit('owner-read:'+o.id,120,600);const v=b.body||{};
   if(v.action==='status')return (await import('./filling-status.ts')).platformFillingStatus(db,v);
+  if(['transfer-load','transfer-import'].includes(v.action)){
+   const {transferView,transferImport}=await import('./transfer-api.ts');
+   if(v.action==='transfer-load'&&!v.schoolId){const {data,error}=await db.from('s4_schools').select('id,code,school:data->school').eq('enabled',true).order('code');if(error)fail('Senarai sekolah belum tersedia.',503);return {schools:data.map((s:Row)=>({id:s.id,code:s.code,name:s.school.name}))};}
+   if(typeof v.schoolId!=='string')fail('Pilih sekolah.');
+   const result=v.action==='transfer-load'?await db.rpc('s4_read_school',{p_id:v.schoolId}):await db.from('s4_schools').select('*').eq('id',v.schoolId).maybeSingle();
+   const row=result.data;if(result.error)fail('Data sekolah belum dapat dimuatkan.',503);if(!row||!row.enabled)fail('Sekolah aktif tidak ditemui.',404);
+   const m={id:o.id,role:'admin',active:1,displayName:'Super Admin'};
+   if(v.action==='transfer-load')return transferView(row.data,m,v.year);
+   if(b.method!=='POST')fail('Gunakan POST.',405);
+   await limit('owner-write:'+o.id,30,600);const response=transferImport(row.data,m,v);
+   const saved=await db.from('s4_schools').update({data:row.data,revision:row.revision+1,updated_at:now()}).eq('id',row.id).eq('revision',row.revision).eq('enabled',true).select('id');
+   if(saved.error)fail('Import belum dapat disimpan.',503);if(!saved.data?.length)fail('Rekod sekolah telah berubah. Muat semula pratonton.',409);return response;
+  }
   if(b.method==='GET'){
    const {data,error}=await db.from('s4_schools').select('id,code,enabled,revision,updated_at,school:data->school,members:data->members,teachers:data->teachers,assessments:data->assessments,audit:data->audit').order('code');if(error)fail('Senarai sekolah belum tersedia.',503);
    const receipts=await db.from('s4_owner_deletions').select('id,school_code,created_at,pending_auth').eq('actor_id',o.id).order('created_at',{ascending:false}).limit(100);if(receipts.error)fail('Sejarah pemadaman belum tersedia.',503);
