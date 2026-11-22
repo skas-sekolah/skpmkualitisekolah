@@ -30,5 +30,5 @@ assert.deepEqual(ids({state:'working'},{column:'unit',direction:'asc'}),['math',
 const numbered=[{...base,id:'ten',aspect:'3.1.2.10'},{...base,id:'two',aspect:'3.1.2.2'}];
 assert.deepEqual(ids({}, {column:'aspect',direction:'asc'},numbered),['two','ten'],'Standard sorting is numeric, not lexicographic');
 assert.deepEqual(rows,before,'Filtering and sorting never mutate server rows or source ordering');
-const ui=fs.readFileSync('app/filling-status.tsx','utf8');assert.ok(ui.includes('aria-sort='));assert.ok(ui.includes('aria-expanded={header===c.id}'));assert.ok(ui.includes("if(e.key==='Escape')"));assert.ok(ui.includes('...shown.map(r=>'));
+const ui=fs.readFileSync('app/filling-status.tsx','utf8');assert.ok(ui.includes('aria-sort='));assert.ok(ui.includes('onClick={()=>setSort(previous=>'));assert.ok(!ui.includes('filling-column-panel'));assert.ok(!ui.includes('Tapis / Susun'));assert.ok(!ui.includes('aria-expanded='));assert.ok(ui.includes('...shown.map(r=>'));
 console.log('PASS header filters: multi-unit/PPS choices, combined filters/search, exact states/evidence, full/partial/empty/0-of-0 distinction, numeric/stable/date sorts, source immutability and export uses displayed rows');
