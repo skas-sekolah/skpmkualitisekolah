@@ -134,6 +134,7 @@ export async function appApi<T=AppData>(body?:unknown):Promise<T>{if(!controller
 export function clientMayWrite(s:AppSession,teachers:AppData['teachers'],teacher:AppData['teachers'][number],stage:string){if(s.isAdmin)return true;if(stage==='kendiri')return teacher.id===s.teacherId;const own=teachers.find(t=>t.id===s.teacherId);return !!own&&(stage==='pertama'?teacher.pp1:teacher.pp2).trim().toUpperCase()===own.name.trim().toUpperCase();}
 
 export function strengthApi(body:Record<string,unknown>):Promise<StrengthBundle>{if(!controller)throw Error('Sila log masuk dahulu.');return controller.strengthCall(body);}
+export function pdpcPending(){return controller?.snapshot?.pending??[];}
 export function strengthPending(){return controller?.strengthPending()??[];}
 export async function discardStrengthDraft(year:number,aspect:string){if(!controller)throw Error('Sila log masuk dahulu.');await controller.discardStrength(year,aspect);}
 export async function syncStrengthDrafts(){if(!controller)throw Error('Sila log masuk dahulu.');await controller.sync();}

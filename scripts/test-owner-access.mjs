@@ -12,6 +12,7 @@ function moduleURL(file){
  source=source.replace(/import source from '\.\/rubric.json' with \{type:'json'\};/,'const source='+fs.readFileSync('migration/backend/rubric.json','utf8')+';');
  source=source.replace(/from '(\.\/[^']+\.ts)'/g,(_,rel)=>'from '+JSON.stringify(moduleURL(path.resolve(path.dirname(file),rel))));
  source=source.replace("import {createClient} from 'npm:@supabase/supabase-js@2.102.0';",'const createClient=()=>globalThis.__schoolTestDB;');
+ source=source.replace(/import\('(\.\/[^']+\.ts)'\)/g,(_,rel)=>'import('+JSON.stringify(moduleURL(path.resolve(path.dirname(file),rel)))+')');
  const url=compile(source);modules.set(file,url);return url;
 }
 const {ownerApi}=await import(moduleURL(path.resolve('migration/backend/owner-api.ts')));
@@ -32,6 +33,19 @@ await assert.rejects(()=>api.route(request('owner-auth'),{...b,sid:'f'.repeat(64
 await assert.rejects(()=>api.route(request('owner-auth'),{...b,expected:'somebody-else'}),e=>e.status===401);
 tables.s4_schools.push({id:'school-one',code:'ABC001',revision:1,enabled:true,data:{school:{id:'school-one',code:'ABC001',name:'Fixture school'},members:[{id:'school-admin',username:'admin',role:'admin',displayName:'Admin',active:1,authUserId:'school-auth',privateField:'DO-NOT-EXPOSE'}],teachers:[],assessments:[{scores:[4]}],sessions:[{hash:'secret-school-session'}],invitations:[],audit:[]}});
 const listing=await api.route(request('owner-auth'),b);assert.equal(listing.schools[0].accounts,1);assert.equal(JSON.stringify(listing).includes('DO-NOT-EXPOSE'),false);assert.equal(JSON.stringify(listing).includes('secret-school-session'),false);assert.equal(JSON.stringify(listing).includes('scores'),false);
+// Real owner transfer routes with fictional school documents and live-session checks.
+const transferDoc={school:{id:'transfer-school',code:'TRF001',name:'Transfer Fixture'},members:[],teachers:[{id:'trf-teacher',name:'TRANSFER TEACHER',type:'perdana'}],assessments:[],sessions:[],invitations:[],imports:[],audit:[],pdpc:{version:2,epoch:'transfer-test',revision:0,assignments:{}}};
+tables.s4_schools.push({id:'transfer-school',code:'TRF001',enabled:true,revision:1,data:transferDoc});
+db.rpc=async(name,args)=>{assert.equal(name,'s4_read_school');const row=structuredClone(tables.s4_schools.find(s=>s.id===args.p_id)??null);if(row)row.data.audit=[];return {data:row,error:null};};
+const transferRequest=body=>api.route(request('owner-auth'),{...b,method:'POST',body});
+const list=await transferRequest({action:'transfer-load'});assert.equal(list.schools.length,2);
+const projection=await transferRequest({action:'transfer-load',schoolId:'transfer-school',year:2026});assert.equal(projection.school.code,'TRF001');assert.equal(projection.teachers[0].ic,undefined);assert.deepEqual(projection.teachers[0].canImport,['kendiri']);
+await assert.rejects(()=>api.route(request('school-auth'),{...b,method:'POST',body:{action:'transfer-load',schoolId:'transfer-school',year:2026}}),e=>e.status===403);
+const batch={action:'transfer-import',schoolId:'transfer-school',schoolCode:'TRF001',year:2026,epoch:'transfer-test',rows:[{teacherId:'trf-teacher',teacherName:'TRANSFER TEACHER',type:'perdana',stage:'kendiri',scores:Array(38).fill(0),revision:0,replace:false,date:'',subject:'',classroom:''}]};
+const imported=await transferRequest(batch);assert.equal(imported.saved,1);assert.equal(imported.assessments[0].status,'draft');assert.ok(transferDoc.assessments.length===0,'Persisted value replaced atomically, fixture reference not mutated');assert.equal(tables.s4_schools[1].data.audit.at(-1).actorId,'platform-owner');
+await assert.rejects(()=>transferRequest({...batch,schoolCode:'FOREIGN'}),e=>e.status===403);await assert.rejects(()=>transferRequest(batch),e=>e.status===409);
+tables.s4_schools.pop();
+console.log('PASS Super Admin transfer: verified owner session, school selector/read scope, draft import, stale/foreign rejection, original owner identity in audit');
 tables.s4_platform_owners[0].must_change_password=true;await assert.rejects(()=>api.route(request('owner-auth'),b),e=>e.status===403);tables.s4_platform_owners[0].must_change_password=false;
 const post=body=>api.route(request('owner-auth'),{...b,method:'POST',body});
 await assert.rejects(()=>post({action:'school-code',schoolId:'school-one',revision:0,confirmation:'ABC001',code:'ABC002'}),e=>e.status===409);
