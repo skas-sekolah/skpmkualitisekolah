@@ -25,8 +25,8 @@ denied('mo',{action:'save',assessment:{...second,revision:1,status:'submitted',m
 const secondSubmitted=call('mo',{action:'save',assessment:{...second,revision:1,status:'submitted',mutationId:'bbbbbbbb-bbbb-cccc-2222'}}).assessment;
 denied('mo',{action:'pdpc-review',id:secondSubmitted.id,revision:2,decision:'verify'},403);
 call('mr',{action:'pdpc-review',id:secondSubmitted.id,revision:2,decision:'verify'});assert.equal(d.assessments.find(a=>a.id===secondSubmitted.id).status,'verified');assert.deepEqual(d.assessments.find(a=>a.id===firstBefore.id),firstBefore);
-const self={...assessment,stage:'kendiri',evidence:['https://example.test/self-proof'],mutationId:'cccccccc-bbbb-cccc-1111'};call('mt',{action:'save',assessment:self});call('mt',{action:'save',assessment:{...self,revision:1,status:'submitted',mutationId:'cccccccc-bbbb-cccc-2222'}});assert.equal(new Set(d.assessments.map(a=>a.id)).size,3);
-assert.equal(D.getData(d,d.members.find(m=>m.id==='mo')).teachers.some(t=>t.id==='t'),true);d.pdpc.assignments['2026']=[];assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'pertama',2026),false);assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'kedua',2026),false);assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mt'),d.teachers[0],'kendiri',2026),true);
+const self={...assessment,stage:'kendiri',evidence:['https://example.test/self-proof'],mutationId:'cccccccc-bbbb-cccc-1111'};denied('mt',{action:'save',assessment:self},403);call('a',{action:'save',assessment:self});call('a',{action:'save',assessment:{...self,revision:1,status:'submitted',mutationId:'cccccccc-bbbb-cccc-2222'}});assert.equal(new Set(d.assessments.map(a=>a.id)).size,3);
+assert.equal(D.getData(d,d.members.find(m=>m.id==='mo')).teachers.some(t=>t.id==='t'),true);d.pdpc.assignments['2026']=[];assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'pertama',2026),false);assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'kedua',2026),false);assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mt'),d.teachers[0],'kendiri',2026),false);
 console.log('PASS PdPc v2: leader-only observer and assigned reviewer, stable IDs, year isolation, stale/reset epoch rejection, zero-safe scoring, submit/verify/reopen, independent review and immediate revocation.');
 
 console.log('PASS Standard 4 evidence: reject missing or newly added unsaved links at submission; allow evidence saved in a prior draft; invalid links leave records unchanged.');
@@ -54,7 +54,7 @@ console.log('PASS three Standard 4 sessions: legacy shared observer for both rou
  denied('mr',{...claim,revision:d.pdpc.revision},409);
  assert.deepEqual(d.pdpc.assignments['2027'],[{teacherId:'t',observerId:'mo',observer2Id:null,reviewerId:null}]);
  assert.deepEqual(D.getData(d,d.members.find(m=>m.id==='mr')).pdpc.occupiedObservations['2027'].pertama,['t']);
- assert.equal(D.getData(d,d.members.find(m=>m.id==='mt')).pdpc.occupiedObservations,undefined);
+ assert.equal(D.getData(d,d.members.find(m=>m.id==='mt')).pdpc,undefined);
  assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'pertama',2027),true);
  assert.equal(D.mayWrite(d,d.members.find(m=>m.id==='mo'),d.teachers[0],'kedua',2027),false);
  console.log('PASS PdPc self-assignment: eligible leaders only, no self-observation or reassignment, independent rounds and year.');

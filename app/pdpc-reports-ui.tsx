@@ -1,3 +1,4 @@
+import {canAccessStandard4} from './app-client';
 import TableScroller from './table-scroller';
 import {useEffect,useState} from 'react';
 import {Download,Printer,RefreshCw,ArrowLeft} from 'lucide-react';
@@ -9,11 +10,12 @@ import {saveWorkbook} from './teacher-workbook';
 const fmt=(v:number|null|undefined)=>v===null||v===undefined?'—':v.toFixed(2);
 export default function PdpcReports({session,year}:{session:AppSession;year:number}){
  const [data,setData]=useState<AppData|null>(null),[query,setQuery]=useState(''),[category,setCategory]=useState('all'),[teacherId,setTeacherId]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- async function load(){setError('');try{setData(await appApi<AppData>());}catch(e){setError((e as Error).message);}}
+ async function load(){if(!canAccessStandard4(session))return;setError('');try{setData(await appApi<AppData>());}catch(e){setError((e as Error).message);}}
  useEffect(()=>{setData(null);setTeacherId('');void load();},[year,session.memberId]);
  const teachers=(data?.teachers??[]).filter(t=>rosterActive(t,year)||data?.assessments.some(a=>a.teacherId===t.id&&a.year===year)).filter(t=>(category==='all'||t.type===category)&&normalized(t.name).includes(normalized(query))).sort((a,b)=>(a.sourceNumber||99999)-(b.sourceNumber||99999)||a.name.localeCompare(b.name,'ms'));
  const selected=data?.teachers.find(t=>t.id===teacherId);
  async function download(){if(!data)return;setBusy(true);setError('');try{await saveWorkbook(await pdpcReportWorkbook(data,selected?[selected]:teachers,session,year),'SKAS_Standard4_'+(selected?'Individu':'Semua_Guru')+'_'+session.schoolCode+'_'+year+'.xlsx');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ if(!canAccessStandard4(session))return <p role="alert">Standard 4 hanya untuk Admin, Superadmin dan Pentadbir.</p>;
  return <section className="pdpc-report"><div className="skas-heading no-print"><div><h2>Standard 4 – Pencerapan</h2><p>Laporan Individu dan Laporan Semua Guru menggabungkan Penilaian Kendiri, Pencerapan 1 dan Pencerapan 2.</p></div></div>
  <div className="skas-actions no-print">{selected&&<button className="secondary" onClick={()=>setTeacherId('')}><ArrowLeft size={17}/> Laporan Semua Guru</button>}<button className="secondary" disabled={busy} onClick={()=>void load()}><RefreshCw size={17}/> Muat semula laporan</button><button className="secondary" disabled={busy||!data||!(selected||teachers.length)} onClick={()=>void download()}><Download size={17}/> {busy?'Menyediakan Excel…':'Eksport Excel'}</button><button className="primary" disabled={busy||!data||!(selected||teachers.length)} onClick={()=>window.print()}><Printer size={17}/> Cetak / PDF</button></div>
  {error&&<p role="alert" className="skas-alert error">{error}</p>}

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {compile,read,scoring} from './achievement-fixtures.mjs';
+const model=compile(read('app/transfer-model.ts').replace("'./scoring'",JSON.stringify(scoring)));
+const A=await import(compile(read('app/moeis-transfer.ts').replace("'./transfer-model'",JSON.stringify(model)).replace("'./scoring'",JSON.stringify(scoring))));
+const M=await import(model);
+const bundle={school:{id:'s',code:'TRY001',name:'Ujian'},year:2026,epoch:'e',teachers:[{id:'t',name:'GURU UJIAN',type:'perdana',canImport:['kendiri']},{id:'k',name:'GURU KHAS',type:'khas',canImport:['kendiri']}],assessments:[]};
+const record=name=>({meta:{nama_guru:name,kod_sekolah:'TRY001',tahun:'2026',sesi:'kendiri',mata_pelajaran:'MATEMATIK',kelas:'UJIAN',kategori:''},scores:Object.fromEntries(M.TRANSFER_ITEMS.map((x,i)=>[x.code+':'+x.item,i===1?null:i%5]))});
+const message={kind:'SKAS_MOEIS_PREVIEW_V1',id:'fixture',category:'all',records:[record('GURU UJIAN'),record('GURU KHAS')]};
+const result=A.moeisPreviews(message,bundle);assert.equal(result.previews.length,2);assert.equal(result.previews[0].record.teacherId,'t');assert.equal(result.previews[1].record.type,'khas');assert.deepEqual(result.previews[0].record.scores.slice(0,3),[0,null,2]);assert.equal(result.previews[0].selected,true);
+assert.equal(A.moeisPreviews({...message,category:'khas'},bundle).excluded,1);
+for(const patch of [{tahun:'2025'},{kod_sekolah:'OTHER'},{sesi:'invalid'}])assert.throws(()=>A.moeisPreviews({...message,records:[{...record('GURU UJIAN'),meta:{...record('GURU UJIAN').meta,...patch}}]},bundle));
+assert.throws(()=>A.moeisPreviews({...message,records:Array(51).fill(record('GURU UJIAN'))},bundle));
+const bad=record('GURU UJIAN');bad.scores['4.1.1:a']=5;assert.throws(()=>A.moeisPreviews({...message,records:[bad]},bundle));
+const unknown=A.moeisPreviews({...message,records:[record('TIADA')]},bundle);assert.equal(unknown.previews[0].selected,false);assert.ok(unknown.previews[0].errors.length);
+const locked={...bundle,assessments:[{teacherId:'t',year:2026,stage:'kendiri',status:'verified',epoch:'e'}]};assert.ok(A.moeisPreviews(message,locked).previews[0].errors.length);
+console.log('PASS auto inbox: batch bounds, all/categories, identity matching, school/year/session, zero/null, unknown names, locked assessments.');

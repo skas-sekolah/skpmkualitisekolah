@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "SK@S \u2014 Pemindahan Skor MOEIS",
+  "version": "0.2.0",
+  "minimum_chrome_version": "102",
+  "description": "Kutip semua 38 item dan semua guru dalam sesi MOEIS secara automatik; hantar ke pratonton SK@S.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Pemindahan SK@S"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://moeisins.moe.gov.my"
+  },
+  "host_permissions": [
+    "https://skas-sekolah.github.io/skpmkualitisekolah/*"
+  ]
+}

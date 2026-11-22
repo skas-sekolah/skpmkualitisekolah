@@ -17,7 +17,7 @@ assert.equal(command().updated,2);assert.equal(d.rosterRevision,1);
 assert.deepEqual({marks:d.assessments,members:d.members,pdpc:d.pdpc,resources:d.resources},preserved);
 assert.equal(S.rosterActive(d.teachers[0],2026),true);assert.equal(S.rosterActive(d.teachers[0],2027),false);assert.equal(S.rosterActive(d.staff[0],2027),false);
 assert.equal(D.eligiblePPSAssignee(d,'staff:s',2026),true);assert.equal(D.eligiblePPSAssignee(d,'staff:s',2027),false);assert.equal(D.eligibleScoreAssignee(d,'teacher:t',false,2027),false);assert.equal(D.eligibleStrengthAssignee(d,'staff:s',2027),false);
-assert.equal(D.mayWrite(d,writer,d.teachers[0],'kendiri',2026),true);assert.equal(D.mayWrite(d,writer,d.teachers[0],'kendiri',2027),false);
+assert.equal(D.mayWrite(d,writer,d.teachers[0],'kendiri',2026),false);assert.equal(D.mayWrite(d,admin,d.teachers[0],'kendiri',2026),true);assert.equal(D.mayWrite(d,writer,d.teachers[0],'kendiri',2027),false);
 assert.equal(D.assignmentPeople(d,2027).find(p=>p.id==='teacher:t').available,false);assert.equal(D.assignmentPeople(d,2027).find(p=>p.id===writer.id).available,false);
 assert.equal(R.resourcesView(d,admin,2026).standard4.expected,9);assert.equal(R.resourcesView(d,admin,2027).standard4.expected,6);
 assert.equal(M.scoringReport(d,2026).pdpc.all.all.expectedCount,9);assert.equal(D.getData(d,admin).assessments.length,1);
