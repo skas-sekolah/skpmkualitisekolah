@@ -39,11 +39,12 @@ tables.s4_schools.push({id:'transfer-school',code:'TRF001',enabled:true,revision
 db.rpc=async(name,args)=>{assert.equal(name,'s4_read_school');const row=structuredClone(tables.s4_schools.find(s=>s.id===args.p_id)??null);if(row)row.data.audit=[];return {data:row,error:null};};
 const transferRequest=body=>api.route(request('owner-auth'),{...b,method:'POST',body});
 const list=await transferRequest({action:'transfer-load'});assert.equal(list.schools.length,2);
-const projection=await transferRequest({action:'transfer-load',schoolId:'transfer-school',year:2026});assert.equal(projection.school.code,'TRF001');assert.equal(projection.teachers[0].ic,undefined);assert.deepEqual(projection.teachers[0].canImport,['kendiri']);
+const projection=await transferRequest({action:'transfer-load',schoolId:'transfer-school',year:2026});assert.equal(projection.school.code,'TRF001');assert.equal(projection.teachers[0].ic,undefined);assert.deepEqual(projection.teachers[0].canImport,['kendiri','pertama','kedua']);
 await assert.rejects(()=>api.route(request('school-auth'),{...b,method:'POST',body:{action:'transfer-load',schoolId:'transfer-school',year:2026}}),e=>e.status===403);
 const batch={action:'transfer-import',schoolId:'transfer-school',schoolCode:'TRF001',year:2026,epoch:'transfer-test',rows:[{teacherId:'trf-teacher',teacherName:'TRANSFER TEACHER',type:'perdana',stage:'kendiri',scores:Array(38).fill(0),revision:0,replace:false,date:'',subject:'',classroom:''}]};
 const imported=await transferRequest(batch);assert.equal(imported.saved,1);assert.equal(imported.assessments[0].status,'draft');assert.ok(transferDoc.assessments.length===0,'Persisted value replaced atomically, fixture reference not mutated');assert.equal(tables.s4_schools[1].data.audit.at(-1).actorId,'platform-owner');
 await assert.rejects(()=>transferRequest({...batch,schoolCode:'FOREIGN'}),e=>e.status===403);await assert.rejects(()=>transferRequest(batch),e=>e.status===409);
+const rounds=await transferRequest({...batch,rows:['pertama','kedua'].map(stage=>({...batch.rows[0],stage}))});assert.equal(rounds.saved,2);assert.equal(rounds.assessments.filter(a=>['pertama','kedua'].includes(a.stage)).length,2);assert.ok(rounds.assessments.every(a=>a.status==='draft'));
 tables.s4_schools.pop();
 console.log('PASS Super Admin transfer: verified owner session, school selector/read scope, draft import, stale/foreign rejection, original owner identity in audit');
 tables.s4_platform_owners[0].must_change_password=true;await assert.rejects(()=>api.route(request('owner-auth'),b),e=>e.status===403);tables.s4_platform_owners[0].must_change_password=false;
