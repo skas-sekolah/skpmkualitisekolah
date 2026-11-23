@@ -70,6 +70,29 @@ jobs:
         with:
           path: docs
           name: github-pages-${{ github.run_attempt }}
+      - name: Wait for Pages artifact
+        env:
+          SKAS_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoint = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}/artifacts`;
+          const artifactName = process.env.SKAS_ARTIFACT_NAME;
+          for (let attempt = 0; attempt < 24; attempt++) {
+            const response = await fetch(endpoint, {headers: {
+              Accept: 'application/vnd.github+json',
+              'Cache-Control': 'no-cache'
+            }});
+            if (!response.ok) throw new Error(`Artifact lookup failed: HTTP ${response.status}`);
+            const result = await response.json();
+            if (result.artifacts?.some(item => item.name === artifactName && !item.expired)) {
+              console.log(`Pages artifact is available: ${artifactName}`);
+              break;
+            }
+            if (attempt === 23) throw new Error('Pages artifact metadata is still unavailable. Retry this deployment.');
+            console.log('Waiting for GitHub to expose uploaded Pages artifact metadata...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          NODE
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
