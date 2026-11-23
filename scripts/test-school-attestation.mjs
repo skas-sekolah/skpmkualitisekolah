@@ -33,3 +33,8 @@ d.achievement[2026]['5.1.1'].revision++;assert.equal((await call(d,pgb,moduleBod
 // Existing prohibition on certifying one's own entered scores also applies to a batch.
 d.strength[2026].A1.status='submitted';d.strength[2026].A1.lastEditorId=pgb.id;const atomic=JSON.stringify(d.strength);moduleView=await call(d,pgb,moduleBody);assert.equal(moduleView.ready,false);await assert.rejects(()=>call(d,pgb,{...moduleBody,action:'final-attest',confirmed:true,fingerprint:moduleView.fingerprint,revision:moduleView.revision}),e=>e.status===409);assert.equal(JSON.stringify(d.strength),atomic);
 console.log('PASS independent module verification: all A1–A9 in one batch, unrelated incomplete modules allowed, status updates, preserved values/other modules, isolated invalidation and no self-verification.');
+d.strength[2026].A1.lastEditorId=admin.id;
+const hostel=d.strength[2026].A8;hostel.status='submitted';hostel.data={...sm.emptyStrengthData(),applicable:false};hostel.lastEditorId=admin.id;
+moduleView=await call(d,pgb,moduleBody);const hostelRow=moduleView.rows.find(r=>r.id==='A8');assert.equal(hostelRow.ready,true);assert.deepEqual(hostelRow.issues,[]);assert.match(hostelRow.score,/Tidak berkenaan/);assert.equal(moduleView.ready,true);
+const noHostelData=JSON.stringify(hostel.data);await call(d,pgb,{...moduleBody,action:'final-attest',confirmed:true,fingerprint:moduleView.fingerprint,revision:moduleView.revision});assert.equal(d.strength[2026].A8.status,'verified');assert.equal(JSON.stringify(d.strength[2026].A8.data),noHostelData);
+console.log('PASS grouped PGB verification: submitted no-hostel declaration does not block A1–A9 confirmation and no hostel scores/evidence are invented.');

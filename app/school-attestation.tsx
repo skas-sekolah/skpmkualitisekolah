@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {requestJSON,strengthPending,managementPending,achievementPending,subscribeStrength} from './app-client';
 import type {AppSession} from './app-types';
 import type {SchoolAttestation} from '../migration/backend/school-attestation-model';
-import {strengthMetrics,valueText,type StrengthBundle} from '../migration/backend/strength-model';
+import {strengthMetrics,strengthMetricText,valueText,type StrengthBundle} from '../migration/backend/strength-model';
 import {managementTotals,type ManagementBundle} from '../migration/backend/management-model';
 import {achievementEntries,type AchievementBundle} from '../migration/backend/achievement-model';
 import SortableTable from './sortable-table';
@@ -19,7 +19,7 @@ export default function SchoolFinalSummary({session,year,onBusy,initialModule='s
  async function attest(){if(!data||!data.canAttest||!data.ready||!confirmed||pending||busy)return;setBusy(true);setError('');try{const result=await requestJSON<SchoolAttestation>('/api/management',{action:'final-attest',year,module,revision:data.revision,fingerprint:data.fingerprint,confirmed:true},session.memberId);setData(result);setConfirmed(false);setNotice(names[module]+' disahkan secara berkumpulan. Semua item modul telah ditandakan disahkan.');window.dispatchEvent(new Event('module-verification-changed'));}catch(e){setError((e as Error).message);setConfirmed(false);}finally{setBusy(false);}}
  function entries(id:string):{label:string;value:string}[]{
   if(!details||data?.module!==module)return [];
-  if(module==='strength'){const r=(details as StrengthBundle).records.find(r=>r.aspect===id);return r?strengthMetrics(r.aspect,r.data).map(m=>({label:m.label,value:valueText(m.value,m.unit)})):[];}
+  if(module==='strength'){const r=(details as StrengthBundle).records.find(r=>r.aspect===id);return r?strengthMetrics(r.aspect,r.data).map(m=>({label:m.label,value:strengthMetricText(m)})):[];}
   if(module==='management'){const r=(details as ManagementBundle).records.find(r=>r.aspect===id);if(!r)return [];const t=managementTotals(r.aspect,r.data);return [{label:'Skor pengisian',value:valueText(t.percentage,'%')},{label:'Tindakan diisi',value:String(t.filled)+' / '+String(t.count)}];}
   const r=(details as AchievementBundle).records.find(r=>r.aspect===id);return r?achievementEntries(r.aspect,r.data).map(e=>({label:String(e.label),value:String(e.value??'Belum diisi')})):[];
  }

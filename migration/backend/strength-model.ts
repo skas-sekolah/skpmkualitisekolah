@@ -54,8 +54,8 @@ export function cleanStrengthData(aspect:AspectId,input:unknown):StrengthData{
  return result;
 }
 export function strengthIssues(aspect:AspectId,d:StrengthData):string[]{
+ if(aspect==='A8'&&d.applicable===false)return [];
  const issues:string[]=[];if(!d.evidence.some(v=>v.trim()))issues.push('Masukkan sekurang-kurangnya satu pautan atau fail evidens sebelum menghantar.');
- if(!d.applicable){if(d.notes.trim().length<10)issues.push('Nyatakan sebab asrama tidak berkenaan, sekurang-kurangnya 10 aksara.');return issues;}
  for(const f of FIELDS[aspect]??[])if(d.values[f.key]==null)issues.push('Lengkapkan '+f.label.toLowerCase()+'.');
  if(aspect==='A2'&&d.notes.trim().length<5)issues.push('Nyatakan sumber rumusan Standard 4 tahun sebelumnya dalam catatan.');
  if(HAS_INVENTORY.includes(aspect)){
@@ -81,7 +81,7 @@ export const A3_CRITERIA=[
 ] as const;
 export function a3Scores(d:StrengthData){return A3_CRITERIA.map(c=>{const n=d.values[c.numerator],den=d.values[c.denominator];return n==null||den==null||den===0?null:Math.round(Math.min(1,n/den)*300)/100;});}
 export function strengthMetrics(aspect:AspectId,d:StrengthData):StrengthMetric[]{
- if(!d.applicable)return [{label:'Asrama',value:null,unit:'',note:'Tidak berkenaan — '+d.notes}];const v=d.values;const metric=(label:string,value:number|null,note?:string):StrengthMetric=>({label,value,unit:'%',note});
+ if(aspect==='A8'&&!d.applicable)return [{label:'Asrama',value:null,unit:'',note:'Tidak berkenaan — sekolah tiada asrama'+(d.notes?' · '+d.notes:'')}];const v=d.values;const metric=(label:string,value:number|null,note?:string):StrengthMetric=>({label,value,unit:'%',note});
  if(aspect==='A1')return [metric('Kecukupan guru mengikut ABM',ratio(v.teachers,v.teacherABM)),metric('Guru memenuhi keperluan opsyen',ratio(v.optionTeachers,v.teacherABM)),metric('Guru dengan kepakaran diiktiraf',ratio(v.expertTeachers,v.teachers)),metric('Guru berpengalaman memegang jawatan strategik',ratio(v.strategicTeachers,v.experiencedTeachers))];
  if(aspect==='A2')return [metric('Rumusan Standard 4 tahun sebelumnya',v.previousStandard4??null)];
  if(aspect==='A3'){const scores=a3Scores(d);return [...A3_CRITERIA.flatMap((c,i)=>[metric(['Kecukupan AKP mengikut ABM','AKP berpengalaman','Kecukupan pekerja swasta'][i],ratio(v[c.numerator],v[c.denominator])),metric('Skor kriteria '+(i+1),scores[i],'Maksimum 3%. Bilangan ÷ rujukan × 3%; dihadkan kepada 3%.')]),metric('Jumlah skor Aspek 3',scores.every(x=>x!==null)?Math.round(scores.reduce<number>((s,x)=>s+(x??0),0)*100)/100:null,'Maksimum 9%. Jumlah dipaparkan selepas ketiga-tiga kriteria lengkap dan mempunyai pembahagi melebihi sifar.')];}
@@ -419,3 +419,5 @@ export function cleanMoeisStrength(input:unknown):MoeisStrengthSnapshot[]{
   return {aspect:raw.aspect,schoolCode:raw.schoolCode,year:raw.year,capturedAt:raw.capturedAt,score:score(raw.score),criteria};
  });
 }
+
+export const strengthMetricText=(m:StrengthMetric)=>m.value===null&&m.note?.startsWith('Tidak berkenaan')?'Tidak berkenaan':valueText(m.value,m.unit);

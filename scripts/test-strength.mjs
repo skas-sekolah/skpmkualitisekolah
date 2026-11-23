@@ -70,7 +70,9 @@ console.log('PASS: nine aspects, atomic authorization, tenant-safe assignments, 
  console.log('PASS reset: authorization, stale revisions, all nine records, audit and Standard 4 preservation.');
 }
 
-assert.ok(M.strengthIssues('A8',{...na,evidence:[]}).some(s=>s.includes('evidens')),'Not-applicable still requires evidence');
+assert.deepEqual(M.strengthIssues('A8',{...na,evidence:[],notes:''}),[],'No-hostel declaration does not require scores, evidence or reason');
+assert.ok(M.strengthIssues('A8',{...blank,applicable:true}).some(s=>s.includes('evidens')),'Applicable hostel still requires evidence');
+assert.ok(M.strengthIssues('A1',{...blank,applicable:false}).length>0,'NA exemption applies to A8 only');
 
 // Active school Admin can enter unassigned aspects without a teacher link.
 {
@@ -110,3 +112,8 @@ assert.ok(M.strengthIssues('A8',{...na,evidence:[]}).some(s=>s.includes('evidens
  assert.deepEqual(M.a3Scores({...sample,values:{...sample.values,eligibleWorkers:0}}),[2.25,2,null]);
  console.log('PASS Aspek 3 weighted reference, maximum scores, blank/zero denominators and partial totals.');
 }
+const hostelDoc=fixture(),noHostel={...M.emptyStrengthData(),applicable:false};
+call(hostelDoc,'admin',{action:'save',aspect:'A8',revision:0,data:noHostel,mutationId:'a8a8a8a8-1111-2222'});
+call(hostelDoc,'admin',{action:'submit',aspect:'A8',revision:1});assert.equal(current(hostelDoc,'A8').status,'submitted');assert.deepEqual(current(hostelDoc,'A8').data.evidence,[]);assert.equal(current(hostelDoc,'A8').data.notes,'');
+call(hostelDoc,'reviewer',{action:'verify',aspect:'A8',revision:2});assert.equal(current(hostelDoc,'A8').status,'verified');assert.equal(M.strengthMetricText(M.strengthMetrics('A8',noHostel)[0]),'Tidak berkenaan');assert.ok(M.strengthIssues('A8',{...noHostel,applicable:true}).length>0);
+console.log('PASS no-hostel A8: save, submit and independent PGB verification without scores, evidence or notes; applicable hostel still validated.');

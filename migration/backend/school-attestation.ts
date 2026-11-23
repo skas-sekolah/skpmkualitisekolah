@@ -12,7 +12,7 @@ export async function schoolAttestation(d:SchoolDoc,m:Row,b:Row):Promise<SchoolA
  if(!validYear(b.year))fail('Tahun tidak sah.');const year=b.year,key=String(year),store=d as any;
  const strength=strengthView(d,m,year),management=managementView(d,m,year),achievement=achievementView(d,m,year),rows:FinalRow[]=[];
  const add=(module:string,r:any,title:string,issues:string[],score:string)=>{const submitted=['submitted','verified'].includes(r.status);rows.push({module,id:r.aspect,title,status:r.status,ready:submitted&&!issues.length,score,issues:[...(!submitted?['Pengisi belum menghantar borang lengkap.']:[]),...issues]});};
- for(const r of strength.records)add('Kekuatan Kami',r,ASPECTS.find(a=>a.id===r.aspect)!.name,strengthIssues(r.aspect,r.data),r.moeis?'MOEIS '+r.moeis.score.toFixed(2)+'%':'Rujuk rumusan aspek');
+ for(const r of strength.records)add('Kekuatan Kami',r,ASPECTS.find(a=>a.id===r.aspect)!.name,strengthIssues(r.aspect,r.data),r.aspect==='A8'&&!r.data.applicable?'Tidak berkenaan · tiada asrama':r.moeis?'MOEIS '+r.moeis.score.toFixed(2)+'%':'Rujuk rumusan aspek');
  for(const r of management.records){const p=managementTotals(r.aspect,r.data).percentage;add('Pengurusan Kami',r,MANAGEMENT_UNITS.find(a=>a.id===r.aspect)!.name,managementIssues(r.aspect,r.data),p===null?'Belum lengkap':p.toFixed(2)+'%');}
  for(const r of achievement.records)add('Pencapaian Kami',r,ACHIEVEMENT_ITEMS.find(a=>a.id===r.aspect)!.name,achievementIssues(r.aspect,r.data),'Rujuk rumusan pencapaian');
  const teachers=d.teachers.filter(t=>rosterActive(t,year));
