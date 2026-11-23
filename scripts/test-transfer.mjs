@@ -23,10 +23,10 @@ assert.ok(M.previewTransfer({...record,scores:Array(38).fill(null)},bundle,'empt
 const duplicateNames={...bundle,teachers:[{...teacher,canImport:['kendiri']},{...teacher,id:'other',canImport:['kendiri']}]};assert.ok(M.previewTransfer({...record,teacherId:''},duplicateNames,'ambiguous').errors.some(e=>e.includes('berulang')));
 const d=fixture();d.teachers=[teacher];d.pdpc={version:2,epoch:'test-epoch',revision:0,assignments:{}};const admin=d.members[0];
 const command={year:2026,epoch:'test-epoch',schoolCode:d.school.code,rows:[{...record,revision:0,replace:false}]};
-const view=API.transferView(d,admin,2026);assert.deepEqual(view.teachers[0].canImport,['kendiri']);assert.equal(view.teachers[0].ic,undefined);
+const view=API.transferView(d,admin,2026);assert.deepEqual(view.teachers[0].canImport,['kendiri','pertama','kedua']);assert.equal(view.teachers[0].ic,undefined);
 const saved=API.transferImport(d,admin,command);assert.equal(saved.saved,1);assert.equal(d.assessments[0].status,'draft');assert.deepEqual(d.assessments[0].scores,record.scores);
 let before=structuredClone(d);assert.throws(()=>API.transferImport(d,d.members[1],command),e=>e.status===403);assert.deepEqual(d,before);
-for(const patch of [{schoolCode:'FOREIGN'},{epoch:'old'},{rows:[{...command.rows[0],stage:'kedua'}]},{rows:[{...command.rows[0],revision:0,replace:true}]}]){before=structuredClone(d);assert.throws(()=>API.transferImport(d,admin,{...command,...patch}));assert.deepEqual(d,before);}
+for(const patch of [{schoolCode:'FOREIGN'},{epoch:'old'},{rows:[{...command.rows[0],revision:0,replace:true}]}]){before=structuredClone(d);assert.throws(()=>API.transferImport(d,admin,{...command,...patch}));assert.deepEqual(d,before);}
 // Original metadata and evidence stay intact when replacing a draft.
 d.assessments[0].notes='Keep this note';d.assessments[0].evidence=['https://example.test/proof'];
 API.transferImport(d,admin,{...command,rows:[{...command.rows[0],scores:Array(38).fill(0),revision:1,replace:true}]});assert.equal(d.assessments[0].notes,'Keep this note');assert.deepEqual(d.assessments[0].evidence,['https://example.test/proof']);assert.equal(d.assessments[0].revision,2);
@@ -58,3 +58,22 @@ sheet.getCell(10,2).value=null;sheet.getCell(10,3).value='Aspek 4.1.1';
 sheet.getCell(11,3).value={formula:'1+1',result:2};sheet.getCell(12,3).value=0;sheet.getCell(13,3).value=4;
 const cached=await W.readScoreWorkbook(new File([await radio.xlsx.writeBuffer()],'formula.xlsx'));assert.deepEqual(cached[0].scores.slice(0,3),[2,0,4]);
 console.log('PASS workbook: generated Excel round trip for Perdana/PKhas, real zero/blank, .xlsm file container, cached formula values, malformed/foreign template rejection');
+// Importing existing MOEIS scores is an Admin operation, independent of observer assignments.
+for(const actor of ['admin','owner']){
+ const doc=fixture();doc.teachers=[teacher];doc.pdpc={version:2,epoch:'test-epoch',revision:9,assignments:{2026:[{teacherId:teacher.id,observerId:'assigned-observer',observer2Id:'other-observer',reviewerId:null}]}};
+ const member=actor==='admin'?doc.members[0]:{id:'owner-fixture',role:'admin',active:1,displayName:'Super Admin'};
+ const assignments=structuredClone(doc.pdpc),rows=['pertama','kedua'].map(stage=>({...record,stage,revision:0,replace:false}));
+ assert.deepEqual(API.transferView(doc,member,2026).teachers[0].canImport,['kendiri','pertama','kedua']);
+ for(const stage of ['pertama','kedua']){
+  assert.equal(D.mayWrite(doc,member,teacher,stage,2026),false,'Ordinary edit permissions must stay scoped to observers');
+  assert.throws(()=>D.dataCommand(doc,member,{action:'save',adminImportDraft:true,assessment:{...record,stage,status:'draft',revision:0}}),e=>e.status===403,'Untrusted request-body flags cannot bypass assigned editing');
+ }
+ assert.equal(API.transferImport(doc,member,{year:2026,epoch:'test-epoch',schoolCode:doc.school.code,rows}).saved,2);
+ assert.equal(doc.assessments.length,2);assert.ok(doc.assessments.every(a=>a.status==='draft'&&a.updatedBy===member.id&&a.evaluator===''));assert.deepEqual(doc.pdpc,assignments);
+ const first=doc.assessments.find(a=>a.stage==='pertama');first.evaluator='PENCERAP ASAL';first.notes='CATATAN ASAL';first.evidence=['https://example.test/asli'];
+ API.transferImport(doc,member,{year:2026,epoch:'test-epoch',schoolCode:doc.school.code,rows:[{...rows[0],replace:true,revision:first.revision}]});
+ const replaced=doc.assessments.find(a=>a.stage==='pertama');assert.equal(replaced.evaluator,'PENCERAP ASAL');assert.equal(replaced.notes,'CATATAN ASAL');assert.deepEqual(replaced.evidence,['https://example.test/asli']);
+ for(const status of ['submitted','verified']){replaced.status=status;const before=structuredClone(doc);assert.throws(()=>API.transferImport(doc,member,{year:2026,epoch:'test-epoch',schoolCode:doc.school.code,rows:[{...rows[0],replace:true,revision:replaced.revision}]}),e=>e.status===409);assert.deepEqual(doc,before);}
+ const before=structuredClone(doc);assert.throws(()=>API.transferImport(doc,doc.members[1],{year:2026,epoch:'test-epoch',schoolCode:doc.school.code,rows}),e=>e.status===403);assert.deepEqual(doc,before);
+}
+console.log('PASS Admin/Superadmin import both observation sessions: assignments unchanged, ordinary editing restricted, untrusted bypass rejected, draft-only records, original evaluator/evidence preserved and submitted/verified locks retained.');
