@@ -1,0 +1,43 @@
+SK@S ↔ MOEIS 0.5.0
+
+PASANG / KEMAS KINI (Chrome komputer)
+1. Ekstrak ZIP ini. Cari folder yang mempunyai fail manifest.json.
+2. Buka chrome://extensions dan hidupkan Developer mode.
+3. Jika menggantikan folder extension lama, pilih folder baharu melalui Load unpacked.
+   Jika menggunakan folder lama yang sama, gantikan fail dan tekan Reload.
+4. Semak versi 0.5.0 dan pin ikon extension.
+5. Simpan hasil kutipan/CSV versi lama sebelum menukar folder atau reload.
+
+SK@S → MOEIS — EMPAT MODUL
+1. Dalam SK@S, buka Muat Naik dan Muat Turun → Muat Turun.
+2. Tandakan Kekuatan Kami / Pengurusan Kami / Pencapaian Kami / Standard 4.
+   Pengurusan ada pilihan: Pengurusan, Panitia Mata Pelajaran, Kelab/Persatuan,
+   Badan Beruniform dan Sukan/Permainan.
+3. Muat turun Pakej pilihan (JSON).
+4. Log masuk MOEIS sendiri. Buka extension → SK@S → MOEIS.
+5. Pilih pakej JSON, tandakan modul/bahagian dan pilih rekod.
+6. Buka borang aspek/standard/unit yang sama dalam MOEIS.
+   Tekan Semak medan borang; padankan nilai SK@S dengan ruangan sasaran.
+   Pilihan awal "Jangan isi" — tiada padanan atau penukaran skor diandaikan.
+7. Semak sekolah, tahun, aspek, unit dan semua nilai. Tandakan pengesahan,
+   kemudian Isi medan yang dipilih. Semak borang dan tekan Simpan di MOEIS.
+
+STANDARD 4 — CSV / PAKEJ JSON
+CSV lengkap SK@S seorang atau sehingga 50 guru diterima. Pilih seorang guru/sesi.
+Buka Senarai Guru MOEIS bagi sesi sasaran dan tekan Semak Senarai Guru.
+Kemudian buka borang guru, Semak borang semasa, tandakan pengesahan dan Isi
+subaspek semasa. Semak dan Simpan dalam MOEIS. Ulang untuk 8 subaspek.
+Jika guru tidak ada dalam halaman senarai yang disemak, semak halaman senarainya.
+
+MOEIS → SK@S
+Fungsi kutipan automatik 0.4.1 dikekalkan dalam tab berasingan. Hasil boleh
+ dimuat turun sebagai CSV atau dihantar ke pratonton SK@S sebelum Simpan.
+
+HAD YANG PERLU DIKETAHUI
+- Pengisian balik memerlukan padanan medan dan semakan pengguna.
+- Extension tidak menekan Simpan, menghantar borang atau menambah baris program.
+- Pencapaian 5.1 yang dijana automatik, medan dikunci dan lampiran fail tidak diisi.
+- Pautan evidens boleh dieksport; muat naik fail lampiran di MOEIS sendiri.
+- Skor mentah 0–4 tidak ditukar terus kepada peratus atau skor wajaran.
+- Empat modul memerlukan kemas kini SK@S yang menyediakan pakej JSON ini.
+- Ujian menggunakan data rekaan; pengisian/simpanan MOEIS sebenar belum disahkan.

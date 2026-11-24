@@ -12,6 +12,7 @@ function moduleURL(file){
  source=source.replace(/import source from '\.\/rubric.json' with \{type:'json'\};/,'const source='+fs.readFileSync('migration/backend/rubric.json','utf8')+';');
  source=source.replace(/from '(\.\/[^']+\.ts)'/g,(_,rel)=>'from '+JSON.stringify(moduleURL(path.resolve(path.dirname(file),rel))));
  source=source.replace("import {createClient} from 'npm:@supabase/supabase-js@2.102.0';",'const createClient=()=>globalThis.__schoolTestDB;');
+ source=source.replace(/import\('(\.\/[^']+\.ts)'\)/g,(_,rel)=>'import('+JSON.stringify(moduleURL(path.resolve(path.dirname(file),rel)))+')');
  const url=compile(source);modules.set(file,url);return url;
 }
 const rows=new Map(),users=new Map();let handler,conflict=false,writes=0,insertedConfig;
@@ -94,6 +95,7 @@ try{
  const loginBefore=clone(rows.get(login.context.schoolId).data);const logins=await Promise.all([1,2,3].map(()=>request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}})));assert.ok(logins.every(r=>r.status===200));const loginAfter=clone(rows.get(login.context.schoolId).data);assert.equal(loginAfter.sessions.length,loginBefore.sessions.length+3);delete loginAfter.sessions;delete loginBefore.sessions;assert.deepEqual(loginAfter,loginBefore);
 
 
+ const exportBefore=clone(rows.get(login.context.schoolId));const exported=await request({...login.context,path:'/api/data',method:'POST',body:{action:'transfer-export',year:2026,modules:['strength','management','achievement','standard4'],managementGroups:['management','subjects','clubs','uniforms','sports']}});assert.equal(exported.status,200);assert.equal(exported.data.kind,'SKAS_MOEIS_UPLOAD_V1');assert.deepEqual(rows.get(login.context.schoolId),exportBefore,'Export must not write scores/session data');
  const ppdToken=crypto.randomUUID();users.set(ppdToken,{email:'ppd@fixture.invalid',password:'fixture-password'});
  for(const route of ['/api/data','/api/school','/api/strength','/api/management','/api/achievement','/api/resources']){const denied=await request({...login.context,token:ppdToken,path:route,method:'POST',body:{action:'save',year:2026}});assert.equal(denied.status,401,'PPD identity cannot mutate '+route);}
  const existing=school('FIX004',{pdpc:{version:2,epoch:'existing',revision:7,assignments:{2026:[{teacherId:'t',observerId:'teacher:o',reviewerId:'teacher:o'}]}},assessments:[{id:'existing-record',teacherId:'t',year:2026,stage:'pertama',epoch:'existing',total:'88.00',status:'verified'}]});await existing.save();const preserved=clone(rows.get(existing.context.schoolId));assert.equal((await request(existing.context)).status,200);assert.deepEqual(rows.get(existing.context.schoolId),preserved);

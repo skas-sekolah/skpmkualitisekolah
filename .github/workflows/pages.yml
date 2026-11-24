@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -15,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_fallback.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,6 +47,9 @@ jobs:
       - run: node scripts/test-owner-deletion.mjs
       - run: node scripts/test-transfer.mjs
       - run: node scripts/test-moeis-strength.mjs
+      - run: node scripts/test-moeis-export.mjs
+      - run: node scripts/test-login-overview.mjs
+      - run: node scripts/test-deploy-pages-rest.mjs
       - run: node scripts/test-school-attestation.mjs
       - run: node scripts/test-module-summary-ui.mjs
       - run: node scripts/test-pdpc-compact-table.mjs
@@ -97,6 +101,13 @@ jobs:
           NODE
       - name: Deploy
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
+      - name: Deploy using REST artifact metadata
+        id: deployment_fallback
+        if: steps.deployment.outcome == 'failure'
+        env:
+          GH_PAGES_TOKEN: ${{ github.token }}
+        run: node scripts/deploy-pages-rest.mjs

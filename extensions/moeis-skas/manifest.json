@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "SK@S — Pemindahan Skor MOEIS",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "minimum_chrome_version": "102",
-  "description": "Ambil skor Standard 4 dan snapshot skor wajaran Kekuatan Kami A1–A9 ke pratonton SK@S.",
+  "description": "Pemindahan dua hala SK@S/MOEIS: kutip skor dan isi borang daripada pakej empat modul atau CSV Standard 4.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -18,5 +18,8 @@
   },
   "host_permissions": [
     "https://skas-sekolah.github.io/skpmkualitisekolah/*"
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

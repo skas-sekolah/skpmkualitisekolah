@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import {pathToFileURL} from 'node:url';
+// Fallback when the artifact service used by deploy-pages cannot see an upload
+// that is already present in the authenticated GitHub REST artifact listing.
+export async function deployPages({env=process.env,request=fetch,wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){
+ const repository=env.GITHUB_REPOSITORY,token=env.GH_PAGES_TOKEN,run=Number(env.GITHUB_RUN_ID),attempt=env.GITHUB_RUN_ATTEMPT||'1',base=env.GITHUB_API_URL||'https://api.github.com';
+ if(!/^[\w.-]+\/[\w.-]+$/.test(repository||'')||!token||!Number.isSafeInteger(run)||run<=0||!env.GITHUB_SHA||!env.ACTIONS_ID_TOKEN_REQUEST_URL||!env.ACTIONS_ID_TOKEN_REQUEST_TOKEN)throw Error('Missing deployment context.');
+ const headers={Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28','Cache-Control':'no-cache'};
+ async function api(path,body){const r=await request(base+'/repos/'+repository+path,{method:body?'POST':'GET',headers:{...headers,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error('GitHub Pages request failed: HTTP '+r.status);return r.json();}
+ let artifact;for(let n=0;n<12;n++){const result=await api('/actions/runs/'+run+'/artifacts?per_page=100');const matches=(result.artifacts||[]).filter(a=>a.name==='github-pages-'+attempt&&!a.expired);if(matches.length>1)throw Error('Multiple matching Pages artifacts.');if(matches.length===1){artifact=matches[0];break;}await wait(5000);}if(!artifact||!Number.isSafeInteger(artifact.id))throw Error('Pages artifact is unavailable.');
+ const oidcResponse=await request(env.ACTIONS_ID_TOKEN_REQUEST_URL,{headers:{Authorization:'Bearer '+env.ACTIONS_ID_TOKEN_REQUEST_TOKEN},signal:AbortSignal.timeout(30000)});if(!oidcResponse.ok)throw Error('GitHub deployment identity request failed.');const identity=await oidcResponse.json();if(typeof identity.value!=='string'||!identity.value)throw Error('No deployment identity received.');
+ const deployment=await api('/pages/deployments',{artifact_id:artifact.id,pages_build_version:env.GITHUB_SHA,oidc_token:identity.value});if(!deployment.id)throw Error('No Pages deployment ID received.');
+ for(let n=0;n<60;n++){const status=await api('/pages/deployments/'+encodeURIComponent(deployment.id));if(status.status==='succeed'){const url=deployment.page_url?.startsWith('https://')?deployment.page_url:'https://'+deployment.page_url;return {id:deployment.id,page_url:url};}if(['errored','failed','cancelled','deployment_failed','deployment_content_failed'].includes(status.status))throw Error('Pages deployment failed: '+status.status);await wait(5000);}throw Error('Pages deployment status timed out.');
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{const r=await deployPages();if(process.env.GITHUB_OUTPUT)fs.appendFileSync(process.env.GITHUB_OUTPUT,'page_url='+r.page_url+'\n');console.log('GitHub Pages deployment completed.');}catch(e){console.error(e.message);process.exitCode=1;}}

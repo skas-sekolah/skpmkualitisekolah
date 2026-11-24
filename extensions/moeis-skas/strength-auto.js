@@ -1,19 +1,27 @@
 (()=>{
+async function persistState(value){const result=await chrome.runtime.sendMessage({kind:"SKAS_AUTO_STATE_V1",value});if(!result?.ok)throw Error(result?.message||"Status kutipan tidak dapat disimpan.");}
+
 if(globalThis.SKASStrengthAuto)return;
 const base='/SJN/penilaian-kendiri/kekuatan-kami/',origin='https://moeisins.moe.gov.my';let running=false,stopped=false;
 const text=e=>(e?.textContent||'').replace(/\s+/g,' ').trim();
 function safe(raw,from){const u=new URL(raw,from);if(u.hostname!=='moeisins.moe.gov.my'||u.username||u.password||!['http:','https:'].includes(u.protocol)||!u.pathname.startsWith(base)||!/^(index|aspek3-9)$/.test(u.pathname.slice(base.length)))throw Error('Pautan bukan Kekuatan Kami ditolak.');u.protocol='https:';u.hash='';return u.href;}
 function parse(doc,url,options){
- const body=text(doc.body),matches=[...body.matchAll(/\bA([1-9])\s*:\s*/g)].map(m=>'A'+m[1]),aspects=[...new Set(matches)];
- if(aspects.length!==1)throw Error('Tajuk aspek tidak dapat dikenal pasti.');const aspect=aspects[0],u=new URL(url);
- if(u.searchParams.get('no_aspek')&&u.searchParams.get('no_aspek')!==aspect)throw Error('Aspek borang tidak sepadan dengan pautan.');
+ globalThis.SKASLastReadDocuments??={};globalThis.SKASLastReadDocuments.strength=doc;
+ const body=text(doc.body),u=new URL(url);
  if(u.searchParams.get('tahun')!==String(options.year))throw Error('Tahun pautan MOEIS tidak sepadan.');
  const percent=e=>{const m=text(e).match(/^(\d{1,3}(?:[.,]\d{1,2})?)\s*%$/);return m?Number(m[1].replace(',','.')):null;};
- const tables=[...doc.querySelectorAll('table')],header=tables.find(t=>/PERNYATAAN KUALITI/i.test(text(t))&&/\bSKOR\b/i.test(text(t))&&new RegExp(aspect+'\\s*:').test(text(t)));
- if(!header)throw Error('Ringkasan skor aspek tidak ditemui.');const totals=[...header.querySelectorAll('td')].map(percent).filter(v=>v!==null);
+ const tables=[...doc.querySelectorAll('table')];
+ // MOEIS spells this PENYATAAN KUALITI. textContent can join adjacent
+ // cells without spaces (e.g. GURUSKOR), so word boundaries are unsafe.
+ const headers=tables.filter(t=>/PE(?:R)?NYATAAN\s*KUALITI/i.test(text(t))&&/SKOR/i.test(text(t))&&/A[1-9]\s*:/i.test(text(t))).sort((a,b)=>text(a).length-text(b).length),header=headers[0];
+ if(!header)throw Error('Ringkasan skor aspek tidak ditemui (tajuk PENYATAAN KUALITI / SKOR).');
+ const aspects=[...new Set([...text(header).matchAll(/A([1-9])\s*:/gi)].map(m=>'A'+m[1]))];
+ if(aspects.length!==1)throw Error('Tajuk aspek tidak dapat dikenal pasti.');const aspect=aspects[0];
+ if(u.searchParams.get('no_aspek')&&u.searchParams.get('no_aspek')!==aspect)throw Error('Aspek borang tidak sepadan dengan pautan.');
+ const totals=[...header.querySelectorAll('td,th')].map(percent).filter(v=>v!==null);
  if(totals.length!==1)throw Error('Skor jumlah MOEIS tidak jelas.');
  const criteria=[];
- for(const table of tables){if(table===header||!(/SKOR\s*\(%\)/i.test(text(table))))continue;let current=null;
+ for(const table of tables){if(table===header||!(/SKOR\s*\(\s*%\s*\)/i.test(text(table))))continue;let current=null;
   for(const row of table.querySelectorAll('tr')){
    const cells=[...row.cells],scores=cells.map(percent).filter(v=>v!==null);
    if(scores.length>1)throw Error('Lebih daripada satu skor dalam baris.');
@@ -32,7 +40,7 @@ async function collect(options){
  if(running)throw Error('Kutipan masih berjalan.');if(location.origin!==origin)throw Error('Buka MOEIS dahulu.');const start=safe(location.href,location.href),context=new URL(start);
  if(!/^[A-Z0-9][A-Z0-9-]{2,15}$/.test(options.school)||!/^20\d{2}$/.test(String(options.year)))throw Error('Isi sekolah dan tahun.');
  if(context.searchParams.get('tahun')!==String(options.year))throw Error('Tahun MOEIS tidak sepadan.');
- running=true;stopped=false;const state={running:true,rows:[],message:'Membaca Kekuatan Kami…',failed:false};const persist=()=>chrome.storage.session.set({strengthAuto:state});await persist();
+ running=true;stopped=false;const state={running:true,rows:[],message:'Membaca Kekuatan Kami…',failed:false};const persist=()=>persistState({strengthAuto:state});await persist();
  try{const queue=[start],seen=new Set();while(queue.length){if(stopped)throw Error('Kutipan dihentikan.');const url=queue.shift();if(seen.has(url))continue;if(seen.size>=12)throw Error('Had halaman dicapai.');seen.add(url);
   // Read-only GET: no Save or Submit requests are issued.
   const r=await fetch(url,{credentials:'same-origin',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('MOEIS memberi ralat '+r.status);const html=await r.text();if(html.length>5000000)throw Error('Halaman terlalu besar.');const doc=new DOMParser().parseFromString(html,'text/html');
@@ -42,5 +50,5 @@ async function collect(options){
  }
  if(state.rows.length!==9)throw Error('Pautan kesemua A1–A9 tidak ditemui. Kutipan belum lengkap.');state.rows.sort((a,b)=>a.aspect.localeCompare(b.aspect));state.message='Selesai: 9 aspek. Hantar ke pratonton SK@S atau muat turun JSON.';
  }catch(e){state.failed=true;state.message=e.message+' Tiada skor disimpan ke SK@S.';}finally{running=false;state.running=false;await persist();}}
-globalThis.SKASStrengthAuto={parse,safe,start:options=>{if(running)throw Error('Kutipan masih berjalan.');void collect(options).catch(e=>chrome.storage.session.set({strengthAuto:{running:false,rows:[],failed:true,message:e.message}}));return true;},stop:()=>{stopped=true;return true;}};
+globalThis.SKASStrengthAuto={parse,safe,start:options=>{if(running)throw Error('Kutipan masih berjalan.');void collect(options).catch(e=>persistState({strengthAuto:{running:false,rows:[],failed:true,message:e.message}}));return true;},stop:()=>{stopped=true;return true;}};
 })();

@@ -1,0 +1,8 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+test('diagnostic preserves structural labels and scores while excluding teacher / hidden values and URL queries',()=>{
+ const c=textContent=>({textContent,tagName:'TD',rowSpan:1,colSpan:1,querySelectorAll:()=>[]});
+ const doc={querySelectorAll:s=>s==='table'?[{id:'scores',querySelectorAll:()=>[{cells:[c('Nama Guru :'),c('GURU REKAAN PRIVATE'),c('9.42%')]}]}]:s==='form'?[{id:'myForm',getAttribute:()=>'/save?token=PRIVATE_TOKEN'}]:[]};
+ const ctx=vm.createContext({document:doc,URL,location:{pathname:'/SJN/penilaian-kendiri/pengurusan-kami/standard4/pengisianskor',href:'https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard4/pengisianskor?token=PRIVATE_TOKEN'}});vm.runInContext(fs.readFileSync(__dirname+'/../diagnostic.js','utf8'),ctx);const result=JSON.stringify(ctx.SKASDiagnostic('s4'));assert.ok(result.includes('Nama Guru :'));assert.ok(result.includes('9.42%'));assert.ok(!result.includes('GURU REKAAN PRIVATE'));assert.ok(!result.includes('PRIVATE_TOKEN'));
+});
+
+test('wrong module / list page diagnostics are rejected explicitly',()=>{const doc={querySelectorAll:()=>[]};const ctx=vm.createContext({document:doc,URL,location:{pathname:'/SJN/penilaian-kendiri/pengurusan-kami/standard4/senaraiguru',href:'https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard4/senaraiguru'}});vm.runInContext(fs.readFileSync(__dirname+'/../diagnostic.js','utf8'),ctx);assert.throws(()=>ctx.SKASDiagnostic('strength'),/Buka ASPEK A1/);assert.throws(()=>ctx.SKASDiagnostic('s4'),/Buka borang skor/);});
