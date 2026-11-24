@@ -36,7 +36,10 @@ const db={
    }).then(resolve,reject);}
   };return query;
  },
- async rpc(name,args){if(name==='s4_read_school'){const row=clone(rows.get(args.p_id)??null);if(row)row.data.audit=[];return {data:row,error:null};}return {data:true,error:null};},
+ async rpc(name,args){
+ if(name==='s4_login_context'){const r=[...rows.values()].find(r=>r.code===args.p_code);const m=r?.data.members.find(m=>m.username===args.p_username&&m.active===1);return {data:m?{id:r.id,enabled:r.enabled,data:{school:clone(r.data.school),members:[clone(m)],teachers:r.data.teachers.filter(t=>t.id===m.teacherId)}}:null,error:null};}
+ if(name==='s4_open_session'){const r=rows.get(args.p_id),m=r?.data.members.find(m=>m.id===args.p_member&&m.authUserId===args.p_uid&&m.active===1);if(!r?.enabled||!m)return {data:null,error:null};r.data.sessions.push({hash:args.p_hash,memberId:m.id,expiresAt:args.p_expires});if(!r.data.pdpc&&!r.data.assessments.length)r.data.pdpc={version:2,epoch:crypto.randomUUID(),revision:0,assignments:{}};r.revision++;return this.rpc('s4_login_context',{p_code:r.code,p_username:m.username});}
+ if(name==='s4_read_school'){const row=clone(rows.get(args.p_id)??null);if(row)row.data.audit=[];return {data:row,error:null};}return {data:true,error:null};},
  auth:{
   async getUser(token){return {data:{user:users.has(token)?{id:token}:null},error:null};},
   admin:{
@@ -87,7 +90,9 @@ try{
  const concurrent=school('FIX002');await concurrent.save();conflict=true;
  const retry=await request(concurrent.context);assert.equal(retry.status,200);assert.equal(rows.get(concurrent.context.schoolId).revision,9,'Read-only requests do not write or consume a CAS conflict');conflict=false;
  const login=school('FIX003');await login.save();
- const signedIn=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}});assert.equal(signedIn.status,200);assert.equal(rows.get(login.context.schoolId).data.pdpc.version,2);
+ const signedIn=await request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}});assert.equal(signedIn.status,200);assert.equal(rows.get(login.context.schoolId).data.pdpc.version,2);assert.equal(signedIn.data.session.isAdmin,true);
+ const loginBefore=clone(rows.get(login.context.schoolId).data);const logins=await Promise.all([1,2,3].map(()=>request({path:'/api/session',method:'POST',body:{action:'login',schoolCode:'FIX003',username:'admin',password:'fixture-password'}})));assert.ok(logins.every(r=>r.status===200));const loginAfter=clone(rows.get(login.context.schoolId).data);assert.equal(loginAfter.sessions.length,loginBefore.sessions.length+3);delete loginAfter.sessions;delete loginBefore.sessions;assert.deepEqual(loginAfter,loginBefore);
+
 
  const ppdToken=crypto.randomUUID();users.set(ppdToken,{email:'ppd@fixture.invalid',password:'fixture-password'});
  for(const route of ['/api/data','/api/school','/api/strength','/api/management','/api/achievement','/api/resources']){const denied=await request({...login.context,token:ppdToken,path:route,method:'POST',body:{action:'save',year:2026}});assert.equal(denied.status,401,'PPD identity cannot mutate '+route);}

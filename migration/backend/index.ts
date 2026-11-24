@@ -43,7 +43,14 @@ async function sessionRoute(req:Request,b:Row){const v=b.body||{},action=v.actio
  }
  if(!['login','register-school','activate'].includes(action))fail('Tindakan tidak sah.');
  const c=code(v.schoolCode),u=username(v.username),pw=password(v.password);await limit('login:'+c+':'+u,15,600);
- if(action==='login'){const row=await load(c,true),m=row?.data.members.find((m:Row)=>m.username===u&&m.active===1);if(!m?.authUserId)fail('Kod sekolah, ID atau kata laluan tidak betul.',401);const t=await signIn(m.authUserId,pw);if(t.user.id!==m.authUserId)fail('Akaun tidak dibenarkan.',403);return newSession(row!,m,t);}
+ if(action==='login'){
+  const context=await db.rpc('s4_login_context',{p_code:c,p_username:u});if(context.error)fail('Pengesahan akaun belum tersedia.',503);
+  const row=context.data,m=row?.data.members.find((m:Row)=>m.username===u&&m.active===1);if(!m?.authUserId)fail('Kod sekolah, ID atau kata laluan tidak betul.',401);if(!row.enabled)fail('Akses sekolah ini tidak aktif. Hubungi pemilik sistem.',423);
+  const t=await signIn(m.authUserId,pw);if(t.user.id!==m.authUserId)fail('Akaun tidak dibenarkan.',403);
+  const sid=secret(),opened=await db.rpc('s4_open_session',{p_id:row.id,p_member:m.id,p_uid:t.user.id,p_hash:await hash(sid),p_expires:new Date(Date.now()+604800000).toISOString()});
+  if(opened.error)fail('Sesi belum dapat disimpan. Cuba semula.',503);if(!opened.data)fail('Akaun telah berubah atau dinyahaktifkan. Log masuk semula.',401);
+  const current=opened.data,member=current.data.members.find((x:Row)=>x.id===m.id);return {session:session(current.data,member),tokens:tokens(t,sid,current.data,member)};
+ }
  if(action==='register-school'){
   const id=crypto.randomUUID(),m={id:crypto.randomUUID(),schoolId:id,username:u,authUserId:null as string|null,teacherId:null,displayName:text(v.displayName),role:'admin',active:1,mustChangePassword:0,createdAt:now()};
   const d:SchoolDoc={school:{id,code:c,name:text(v.schoolName,5,160),createdAt:now()},teachers:[],assessments:[],members:[m],invitations:[],imports:[],audit:[],sessions:[]};
