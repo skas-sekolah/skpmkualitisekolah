@@ -155,3 +155,5 @@ export async function syncAchievementDrafts(){if(!controller)throw Error('Sila l
 export function subscribeAchievement(listener:()=>void){return controller?.subscribe(listener)??(()=>undefined);}
 
 export async function resourcesApi<T>(body:Record<string,unknown>):Promise<T>{if(!controller)throw Error('Sila log masuk dahulu.');if(!controller.connected())throw Error('Tetapan, tugasan dan muat naik evidens memerlukan internet.');return controller.transport<T>('/api/resources',body,controller.session.memberId);}
+
+export function canOpenEvidenceRoot(){return !!(controller?.session.isAdmin||controller?.session.isSuperAdmin);}
