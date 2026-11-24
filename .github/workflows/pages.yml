@@ -29,6 +29,7 @@ jobs:
       - run: node scripts/test-account-deletion.mjs
       - run: node scripts/test-management.mjs
       - run: node scripts/test-management-offline.mjs
+      - run: node scripts/test-management-reload-ui.mjs
       - run: node scripts/test-resources.mjs
       - run: node scripts/test-drive-evidence.mjs
       - run: node scripts/test-apps-script.mjs
