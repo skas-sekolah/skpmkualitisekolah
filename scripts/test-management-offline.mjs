@@ -51,3 +51,9 @@ const ae=new C.OfflineEngine(adminSession,()=>adminOnline,adminTransport,async e
 const unitDraft={...M.emptyManagementData(),mode:'unit-actions',rows:[{id:'fixture-unit',name:'Private fixture unit',percent:null,notes:'',url:'',data:{scores:{a:0,b:1,c:2,d:3},notes:'Private fixture reference',evidence:['https://example.test/unit']}}]};await ae.managementCall({action:'save',aspect:'3.1.2.1',year:2026,revision:1,data:unitDraft});
 const recovered=await V.decryptSnapshot(adminEncrypted,password);assert.equal(recovered.snapshot.managementPending[0].data.rows[0].data.scores.a,0);assert.ok(recovered.snapshot.managementCache['2026'].report);assert.ok(!JSON.stringify(adminEncrypted).includes('Private fixture unit'));assert.equal((await ae.managementCall({action:'load',year:2026})).records.find(r=>r.aspect==='3.1.2.1').data.rows[0].data.scores.a,0);await assert.rejects(ae.managementCall({action:'report-notes',year:2026,revision:0,notes:{}}),/memerlukan internet/);adminOnline=true;await ae.sync();assert.equal(d.management[2026]['3.1.2.1'].data.rows[0].data.scores.a,0);ae.lock();
 console.log('PASS unit rows/evidence and admin summary use encrypted offline cache, zero survives recovery/sync, PGB writes stay online-only.');
+
+// Explicit recovery must not silently use the offline cache when the server is unavailable.
+connected=false;await assert.rejects(engine.managementCall({action:'load',year:2026,fresh:true}),/internet/);
+connected=true;const originalTransport=engine.transport;engine.transport=async()=>{throw new C.RequestError('Server unavailable',0);};
+await assert.rejects(engine.managementCall({action:'load',year:2026,fresh:true}),/Server unavailable/);engine.transport=originalTransport;
+console.log('PASS explicit management refresh requires a successful online read instead of silently falling back to cache.');

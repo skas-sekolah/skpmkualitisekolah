@@ -79,7 +79,8 @@ export class OfflineEngine{
  async managementCall(body:Record<string,unknown>):Promise<ManagementBundle>{
   const year=body.year;if(!validManagementYear(year))throw Error('Tahun tidak sah.');if(!this.snapshot&&this.connected())await this.load();
   if(body.action==='load'){
-   if(this.connected())try{return await this.rememberManagement(await this.transport<ManagementBundle>('/api/management',body,this.session.memberId));}catch(e){if(!(e instanceof RequestError)||e.status!==0)throw e;}
+   if(body.fresh===true&&!this.connected())throw new RequestError('Sambungkan internet untuk memuatkan rekod terkini.',0);
+   if(this.connected())try{return await this.rememberManagement(await this.transport<ManagementBundle>('/api/management',body,this.session.memberId));}catch(e){if(body.fresh===true||!(e instanceof RequestError)||e.status!==0)throw e;}
    if(!this.key||!this.snapshot||this.snapshot.offlineUntil<=new Date().toISOString())throw Error('Log masuk online dan aktifkan draf offline dahulu.');const cached=this.snapshot.managementCache?.[String(year)];if(!cached)throw Error('Buka Pengurusan Kami untuk tahun ini semasa online dahulu.');return this.managementOverlay(cached);
   }
   if(body.action!=='save'){
