@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {management as modelURL} from './achievement-fixtures.mjs';
+const {MANAGEMENT_UNITS}=await import(modelURL);
+const guides=JSON.parse(fs.readFileSync('app/management-standard-guide.json','utf8'));
+const source=fs.readFileSync('app/management-standard-guide.tsx','utf8').replace(/^import .*;\n/gm,'');
+const compiled=ts.transpileModule(source,{fileName:'guide.tsx',compilerOptions:{jsx:ts.JsxEmit.React,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const exports={};new Function('exports','React','guides',compiled)(exports,React,guides);
+assert.deepEqual(Object.keys(guides).sort(),MANAGEMENT_UNITS.map(u=>u.id).sort());
+for(const {id} of MANAGEMENT_UNITS){
+ const html=renderToStaticMarkup(React.createElement(exports.StandardGuide,{aspect:id}));
+ for(const heading of ['Kriteria Kritikal','Standard Kualiti','Tindakan untuk Mencapai Standard'])assert.ok(html.includes(heading),id+': '+heading);
+ for(const field of ['aspectTitle','criticalCriteria','qualityStandard','standardActions'])assert.ok(guides[id][field]?.trim().length>0,id+': missing '+field);
+ assert.ok(html.startsWith('<details'),id+': descriptions use a disclosure like the scoring rubric');
+ assert.ok(html.includes('<summary>Penerangan standard '+id),id+': labelled toggle');
+ assert.ok(!/<details[^>]*\bopen[= >]/.test(html),id+': collapsed initially');
+ assert.ok(!/https?:|drive.google|<input|<button/.test(html),'Guide must not include evidence URLs or score controls');
+}
+const time=renderToStaticMarkup(React.createElement(exports.StandardGuide,{aspect:'3.1.3.1'}));
+assert.ok(time.includes('Masa instruksional diurus untuk memastikan peningkatan masa pembelajaran berkesan.'));
+assert.ok(time.includes('Masa pelaksanaan PdP diurus secara sistematik dan terancang.'));
+assert.ok(time.includes('Menyediakan pelbagai jadual waktu, melaksanakan PdP seperti yang dijadualkan'));
+const hem=renderToStaticMarkup(React.createElement(exports.StandardGuide,{aspect:'3.3.1.1'}));
+assert.ok(hem.includes('Ketetapan dibuat untuk memastikan kepatuhan dan keselarasan pelaksanaan hal ehwal murid.'));
+assert.ok(hem.includes('Pelaksanaan hal ehwal murid diurus secara sistematik dan terancang.'));
+assert.ok(!hem.includes('Masa instruksional'));
+console.log('PASS all 42 standard guides render three source sections inside a labelled, initially collapsed disclosure; screenshot 3.1.3.1 and HEM 3.3.1.1 retain distinct source descriptions; no evidence or scoring controls in guide.');

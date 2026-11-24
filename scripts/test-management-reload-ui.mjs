@@ -14,7 +14,7 @@ const context={React,...Object.fromEntries(['BookOpen','ClipboardList','CheckCir
  managementApi:async body=>{loads++;assert.equal(body.fresh,true);if(failLoad)throw Error('Server unavailable');return bundle;},
 };
 for(const name of ['TemplatePrint','AssignmentBoard','UnitAssignmentFields','ScoreFields','ScoreResult','ScoreReport','SchoolSummary','PilotLegend','EvidenceInput'])context[name]=()=>null;
-context.scoringStyles='';context.percent=v=>v+'%';
+context.standardGuideStyles='';context.scoringStyles='';context.percent=v=>v+'%';
 const source=fs.readFileSync('app/management-ui.tsx','utf8').replace(/^import .*;\n/gm,'');
 const js=ts.transpileModule(source,{fileName:'reload.tsx',compilerOptions:{jsx:ts.JsxEmit.React,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const exports={};new Function('exports',...Object.keys(context),js)(exports,...Object.values(context));
