@@ -18,6 +18,12 @@ async function run(ctx,expected){
 chrome.runtime.onMessage.addListener((m,sender,reply)=>{
  if(sender.id!==chrome.runtime.id)return;
  if(m.type==='inspect'){call(m.ctx,'inspect').then(data=>reply({ok:true,data}),e=>reply({ok:false,error:e.message}));return true;}
+ if(m.type==='bulk-stop'){batchStop=true;reply({ok:true});return;}
+ if(m.type==='bulk-start'){if(running){reply({ok:false,error:'Proses masih berjalan.'});return;}running=true;void runBatch(m.tabId,m.pack,m.mode);reply({ok:true});return;}
  if(m.type==='start'){if(running){reply({ok:false,error:'Proses masih berjalan.'});return;}running=true;void run(m.ctx,m.expected);reply({ok:true});}
 });
 chrome.runtime.onStartup.addListener(async()=>{const {reliableJob:j}=await chrome.storage.local.get('reliableJob');if(j?.running){j.running=false;j.status='unconfirmed';j.message='Pelayar dimulakan semula. Simpanan belum disahkan; semak MOEIS sebelum mengulang.';await chrome.storage.local.set({reliableJob:j});}});
+
+importScripts('batch-runner.js');
+
+chrome.runtime.onStartup.addListener(async()=>{const {reliableBatch:j}=await chrome.storage.local.get('reliableBatch');if(j?.running){j.running=false;j.status='interrupted';j.message='Pelayar dimulakan semula. Semak rekod terakhir sebelum meneruskan; tiada penghantaran semula automatik.';await chrome.storage.local.set({reliableBatch:j});}});
