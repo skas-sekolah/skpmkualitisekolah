@@ -1,11 +1,11 @@
 {
   "name": "skas-moeis-reliable",
   "private": true,
-  "version": "0.7.2",
+  "version": "0.8.0",
   "scripts": {
-    "test": "node tests/core.test.cjs && node tests/background.test.cjs && node tests/snapshot.test.cjs"
+    "test": "node tests/core.test.cjs && node tests/background.test.cjs && node tests/snapshot.test.cjs && node tests/batch.test.cjs && node tests/batch-page.test.cjs"
   },
   "devDependencies": {
-    "jsdom": "31.0.1"
+    "jsdom": "29.0.1"
   }
 }
