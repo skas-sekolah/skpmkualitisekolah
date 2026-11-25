@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "SK@S — Pengisian MOEIS Berpandu",
+  "version": "0.7.0",
+  "description": "Pengurusan Kami: pilih rekod untuk borang semasa, simpan dan semak semula respons pelayan.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://moeisins.moe.gov.my/SJN/penilaian-kendiri/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
