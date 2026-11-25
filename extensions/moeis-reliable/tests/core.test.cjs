@@ -1,0 +1,18 @@
+const {readFileSync}=require('node:fs'),{join}=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={URL};vm.createContext(ctx);vm.runInContext(readFileSync(join(__dirname,'..','core.js'),'utf8'),ctx);const C=ctx.ReliableCore;
+const url='https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard3-2/list?id_kokurikulum=123&id_aspek=85&tahun=2026&kod_kat_kokurikulum=SP';
+const record={id:'3.2.4.1:fixture',fields:[{key:'scores.a',value:0},{key:'scores.b',value:''},{key:'scores.c',value:' '},{key:'scores.d',value:4},{key:'scores.e',value:true},{key:'scores.f',value:5}]};
+assert.equal(C.scores(record).length,2);
+assert.equal(C.scores(record)[0].value,'0');
+assert.equal(C.scores(record)[1].name,'skor4');
+assert.equal(C.group('3.2.4.1'),'standard3-2');
+assert.equal(C.group('3.3.7.1'),'standard3-3');
+assert.equal(C.context(url,record,2026),C.route(url));
+assert.throws(()=>C.context(url.replace('standard3-2','standard3-1'),record,2026),/Laluan/);
+assert.throws(()=>C.context(url,record,2025),/Tahun/);
+assert.throws(()=>C.context(url+'&no_aspek=3.2.3',record,2026),/Aspek/);
+assert.throws(()=>C.context(url.replace('id_kokurikulum=123','unused=123'),record,2026),/Identiti unit/);
+assert.throws(()=>C.route(url.replace('moeisins.moe.gov.my','example.org')),/borang/);
+assert.throws(()=>C.route(url.replace('/list?','/save?')),/borang/);
+assert.throws(()=>C.decode('{}'),/tidak sah/);
+console.log('Core route and score tests passed. Does not test Chrome integration or MOEIS persistence.');
