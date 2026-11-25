@@ -1,0 +1,55 @@
+importScripts('batch-core.js');
+let batchStop=false;
+async function discoverBatch(ctx,pack){
+ await chrome.scripting.executeScript({target:{tabId:ctx.tabId},files:['core.js','batch-page.js']});
+ const [r]=await chrome.scripting.executeScript({target:{tabId:ctx.tabId},func:async(ctx,pack)=>{try{return {ok:true,data:await ReliableBatchPage.discover(ctx,pack)};}catch(e){return {ok:false,error:e.message};}},args:[ctx,pack]});
+ if(!r?.result?.ok)throw Error(r?.result?.error||'Carian gagal.');return r.result.data;
+}
+async function navigateBatch(ctx){
+ await chrome.tabs.update(ctx.tabId,{url:ctx.url});
+ for(let i=0;i<120;i++){await delay(250);const t=await chrome.tabs.get(ctx.tabId);if(t.status==='complete'){if(ReliableCore.route(t.url)!==ctx.url)throw Error('Alamat borang berbeza daripada pautan asal.');await delay(350);return;}}
+ throw Error('Halaman terlalu lambat.');
+}
+async function runBatch(tabId,pack,mode){
+ batchStop=false;const records=pack.modules.management.records,job={version:'0.8.0',running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
+ const persist=async()=>{job.summary=ReliableBatchCore.totals(records,job.results);job.updatedAt=new Date().toISOString();await chrome.storage.local.set({reliableBatch:job});};
+ try{
+  await persist();const tab=await chrome.tabs.get(tabId),base=ReliableCore.route(tab.url);
+  const found=await discoverBatch({tabId,url:base},pack),routes=ReliableBatchCore.uniqueRoutes(found.targets);
+  job.discovery={visited:found.visited,warnings:found.warnings,unitRows:found.unitRows};job.status='filling';
+  // Reject a shared URL claimed for different source records.
+  const uses=new Map();for(const list of routes.values())for(const t of list.values())uses.set(t.url,(uses.get(t.url)||0)+1);
+  for(const record of records){
+   if(batchStop)break;const count=ReliableCore.scores(record).length;
+   job.message='Memproses '+record.title;await persist();
+   const result={id:record.id,title:record.title,scoreCount:count};
+   try{
+    if(record.readOnly||!count){result.status='empty-skipped';result.message='Tiada skor boleh diisi / rekod rujukan.';}
+    else{
+     const candidates=[...(routes.get(record.id)?.values()||[])];
+     if(candidates.length!==1)throw Error(candidates.length?'Lebih satu pautan; padanan tidak pasti.':'Pautan / nama unit tidak ditemui.');
+     const route=candidates[0];if(uses.get(route.url)!==1)throw Error('Pautan sama digunakan rekod lain.');
+     const ctx={tabId,url:ReliableCore.context(route.url,record,pack.year),record,schoolCode:pack.schoolCode,year:pack.year};
+     await navigateBatch(ctx);const expected=await call(ctx,'inspect');
+     if(expected.fields.every(f=>f.current===f.value)){
+      const verified=await call(ctx,'verify',expected);
+      if(!verified.ok)throw Error('Skor sedia ada tidak disahkan pada pelayan.');
+      result.status='already-matched';result.message='Skor sedia ada disahkan pada pelayan; tiada Simpan baharu.';
+     }else if(mode==='review'){result.status='ready';result.message='Padanan tersedia; semakan sahaja.';}
+     else{
+      result.status='submitting';job.pending={id:record.id,title:record.title};await persist();
+      try{await call(ctx,'apply',expected);}catch(e){if(!/frame.*removed|context.*invalidated|message port closed/i.test(e.message))throw e;}
+      let verified=false,last='';
+      // Stop requests take effect after verification, avoiding accidental duplicate submit.
+      for(let i=0;i<10;i++){await delay(1500);try{const v=await call(ctx,'verify',expected);if(v.ok){verified=true;break;}last='Skor pelayan belum sepadan.';}catch(e){last=e.message;if(ReliableBatchCore.fatal(last))throw e;}}
+      if(!verified)throw Error('Simpanan tidak disahkan. '+last+' Tidak dihantar semula.');
+      result.status='server-confirmed';result.message='Skor disahkan pada respons baharu pelayan.';
+     }
+    }
+   }catch(e){result.status='problem-skipped';result.message=e.message;if(ReliableBatchCore.fatal(e.message))batchStop=true;}
+   delete job.pending;job.results.push(result);await persist();
+  }
+  job.status=batchStop?'stopped':'completed';job.message=batchStop?'Dihentikan. Semak rekod terakhir.':'Proses selesai. Semak peratus disahkan dan rekod dilangkau.';
+ }catch(e){job.status='error';job.message=e.message;}
+ finally{job.running=false;running=false;await persist();}
+}
