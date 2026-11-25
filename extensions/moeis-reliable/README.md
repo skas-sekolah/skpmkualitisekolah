@@ -1,4 +1,4 @@
-# SK@S → MOEIS berpandu 0.7.0
+# SK@S → MOEIS berpandu 0.7.1
 
 Versi pembangunan berasingan untuk menguji satu borang Pengurusan Kami yang betul sebelum menyambung pengisian pukal. Tidak mengubah aplikasi SK@S atau akaun.
 
@@ -18,4 +18,8 @@ Hanya skor tersedia (termasuk 0) diubah. Skor kosong tidak diisi. Simpan dihanta
 Nama unit mesti diperiksa pengguna; versi ini tidak melakukan padanan nama automatik atau pengisian pukal. Tidak melaporkan peratus keseluruhan sekolah. Tiada kata laluan, token atau data sekolah sebenar dalam kod. JSON dipegang dalam memori popup. Laporan hanya rekod terakhir disimpan pada peranti.
 
 ## Status ujian
-Sintaks fail JavaScript dan logik pemilihan skor diuji dalam runtime JavaScript. Logik laluan memerlukan ujian pelayar. Integrasi Chrome dan simpanan pelayan MOEIS BELUM diuji; bukan pengganti stabil bagi versi lama sehingga ujian borang sebenar disahkan. Fail ini ialah sumber pembangunan, bukan bukti simpanan berjaya.
+Ujian Node untuk laluan/skor dan regresi argumen Chrome telah lulus. Semua fail JavaScript lulus semakan sintaks. Integrasi Chrome dan simpanan pelayan MOEIS BELUM diuji; bukan pengganti stabil bagi versi lama sehingga ujian borang sebenar disahkan. Fail ini ialah sumber pembangunan, bukan bukti simpanan berjaya.
+
+
+## Pembetulan 0.7.1
+Argumen kosong kepada chrome.scripting.executeScript kini dihantar sebagai null, bukan undefined. Ini membetulkan ralat args index 2: Value is unserializable ketika Semak borang semasa. Ujian: node tests/core.test.cjs dan node tests/background.test.cjs. Pengesahan simpanan MOEIS sebenar masih diperlukan.
