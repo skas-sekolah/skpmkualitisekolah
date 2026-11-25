@@ -1,7 +1,7 @@
 importScripts('core.js');
 let running=false;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
-async function call(ctx,action,arg){await chrome.scripting.executeScript({target:{tabId:ctx.tabId},files:['core.js','page.js']});const [r]=await chrome.scripting.executeScript({target:{tabId:ctx.tabId},func:async(action,ctx,arg)=>{try{return {ok:true,data:await ReliablePage[action](ctx,arg)};}catch(e){return {ok:false,error:e.message};}},args:[action,ctx,arg]});if(!r?.result?.ok)throw Error(r?.result?.error||'Halaman tidak dapat dibaca.');return r.result.data;}
+async function call(ctx,action,arg){await chrome.scripting.executeScript({target:{tabId:ctx.tabId},files:['core.js','page.js']});const [r]=await chrome.scripting.executeScript({target:{tabId:ctx.tabId},func:async(action,ctx,arg)=>{try{return {ok:true,data:await ReliablePage[action](ctx,arg)};}catch(e){return {ok:false,error:e.message};}},args:[action,ctx,arg??null]});if(!r?.result?.ok)throw Error(r?.result?.error||'Halaman tidak dapat dibaca.');return r.result.data;}
 async function put(job,message,status){Object.assign(job,{message,status,updatedAt:new Date().toISOString()});await chrome.storage.local.set({reliableJob:job});}
 async function run(ctx,expected){
  const job={running:true,recordId:ctx.record.id,title:ctx.record.title,url:ctx.url,scoreCount:expected.fields.length,confirmedScores:0};
