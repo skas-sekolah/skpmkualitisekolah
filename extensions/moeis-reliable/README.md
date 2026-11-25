@@ -1,45 +1,65 @@
-# SK@S → MOEIS berpandu 0.7.2
+# SK@S → MOEIS v0.8.0 — Pengisian berkelompok
 
-## Pembetulan versi ini
-Perbandingan pratonton menggunakan nilai data, bukan susunan kunci objek.
-Susunan kunci yang berubah semasa pemindahan mesej Chrome tidak lagi
-menyebabkan amaran palsu Borang berubah sejak pratonton.
-Perubahan nilai skor, bilangan medan, alamat atau identiti borang sebenar
-masih menyekat penghantaran. Mesej ralat menyenaraikan medan yang berubah.
+Versi ini menambah kelompok Pengurusan Kami menggunakan isi/simpan/pengesahan
+respons pelayan daripada v0.7.2. Alat satu rekod masih tersedia.
 
 ## Pasang
-1. Extract ZIP ke folder baharu.
-2. Nyahaktifkan versi lama di chrome://extensions.
-3. Hidupkan Developer mode, pilih Load unpacked.
-4. Pilih folder yang terus mengandungi manifest.json.
-5. Pastikan versi 0.7.2; muat semula tab MOEIS.
+Extract ZIP ini ke folder baharu. Nyahaktifkan versi lama.
+chrome://extensions → Developer mode → Load unpacked → pilih folder yang
+terus mengandungi manifest.json. Pastikan versi 0.8.0. Muat semula tab MOEIS.
 
-## Ujian satu borang
-Buka borang sebenar melalui menu MOEIS atau ikon pensel.
-Pilih pakej SKAS_KE_MOEIS...json, bukan fail laporan extension.
-Pilih rekod yang sama dengan borang MOEIS, contohnya 3.2.4.1 · BOLA SEPAK.
-Tekan Semak borang semasa. Semak nama unit, standard dan skor dalam pratonton.
-Jangan ubah/navigasi halaman selepas pratonton.
-Tandakan pengesahan dan tekan Isi, Simpan dan Sahkan.
-Tunggu keputusan semakan pelayan. Muat turun laporan.
-Buka semula borang melalui menu MOEIS untuk semakan bebas.
+## Pengisian berkelompok
+1. Log masuk MOEIS. Buka halaman senarai standard/unit bagi sekolah dan tahun betul.
+   Contoh: senarai sukan, kelab atau panitia. Elakkan bermula dalam borang lama.
+2. Buka popup extension dan tekan Buka pengisian berkelompok.
+3. Dalam halaman baharu, pilih pakej JSON SUMBER SK@S terkini,
+   bukan fail laporan extension. Pakej lama masih mengandungi kelab yang dipadam.
+4. Pilih bahagian: Semua / Pengurusan umum / Panitia / Kelab / Uniform / Sukan.
+5. Pilih Isi dan simpan semua padanan yang pasti. Tandakan pengesahan.
+   Semak padanan sahaja tersedia untuk bacaan tanpa penghantaran.
+6. Tekan Mula proses berkelompok. Kekalkan tab MOEIS dan pelayar terbuka.
+   Jangan navigasi tab sasaran secara manual. Popup boleh ditutup.
+7. Lihat kemajuan, skor disahkan dan rekod dilangkau.
+8. Muat turun laporan berkelompok selepas tamat.
+9. Semak beberapa rekod melalui menu MOEIS sendiri selepas proses.
 
-## Maksud pengesahan
-Simpan dihantar sekali. Respons HTML pelayan dibaca dengan cache no-store.
-Skor dalam DOM yang diubah extension bukan bukti simpanan.
-Jika skor belum sepadan atau identiti berubah, laporan kekal unconfirmed.
-Popup boleh ditutup; semakan diteruskan dalam background selagi tab/pelayar
-dan extension kekal tersedia. Elakkan menukar tab sasaran semasa proses.
+## Cara pemadanan
+Carian mengikuti pautan menu dan ikon pensel yang benar-benar ditemui.
+Nombor standard + nama panitia/unit + URL mesti sepadan.
+Pautan dengan tahun lain, sekolah tidak dapat disahkan, standard lain,
+nama tidak sepadan atau beberapa calon tidak digunakan untuk mengisi.
+Had carian 80 halaman atau kira-kira 90 saat; pautan tidak ditemui dilangkau.
+Had ini boleh menyebabkan hanya sebahagian pakej dapat diproses.
+Nama unit diperiksa dengan membuang awalan kategori dan akhiran SR/SM sahaja;
+tiada tekaan singkatan atau alias. Nama yang berbeza boleh terus diisi
+melalui alat satu rekod selepas semakan pengguna.
 
-## Status
-Ujian Node laluan/skor, argumen suntikan Chrome dan fixture DOM lulus.
-Fixture menghasilkan semula kegagalan perbandingan susunan kunci versi lama,
-dan memastikan nilai skor/identiti yang benar-benar berubah tetap ditolak.
-Pemasangan Chrome sebenar dan simpanan MOEIS versi ini belum disahkan.
-Belum menyokong pengisian pukal; tujuan semasa ialah membuktikan satu borang
-yang betul dapat disimpan sebelum automasi pukal diteruskan.
+## Simpan dan pengesahan
+Skor kosong dilangkau, 0 diproses. Rekod readOnly tidak diubah.
+Setiap Simpan dihantar sekali. Selepas itu GET baharu cache no-store
+memeriksa pilihan skor yang datang daripada pelayan pada identiti borang sama.
+Rekod sedia sepadan turut disemak pada pelayan tanpa penghantaran baharu.
+Jika tidak disahkan, rekod dicatat dan proses diteruskan tanpa menghantar semula.
+Sesi tamat, sekolah/tahun salah atau tab ditutup menghentikan proses.
+Butang Hentikan berkuat kuasa selepas rekod/carian semasa selesai.
+Jika pelayar dimulakan semula, laporan ditandakan terganggu dan tiada sambungan
+atau penghantaran semula automatik. Semak rekod terakhir sebelum memulakan semula.
 
-## Ujian pembangunan
+Peratus = skor yang disahkan pada pelayan / skor sumber tersedia dalam bahagian
+pakej pilihan. Ia bukan peratus semua ruangan MOEIS. Proses selesai tidak
+bermaksud semua rekod berjaya. Semak status setiap rekod.
+
+## Skop
+Pengurusan Kami sahaja. Standard 4, Kekuatan Kami dan Pencapaian Kami belum
+termasuk dalam mod kelompok ini. Tiada kata laluan disimpan.
+Pakej untuk mod kelompok hanya menghantar medan skor, identiti dan tajuk;
+evidens/catatan tidak diubah. Laporan disimpan pada Chrome peranti pengguna.
+
+## Pengesahan pembangunan
+Ujian Node untuk skor/laluan, args Chrome, snapshot pratonton, respons pelayan,
+pemadanan ikon pensel dan aliran kelompok lulus menggunakan fixture/simulasi.
+Mod berkelompok v0.8.0 belum disahkan pada pelayan MOEIS sebenar.
+v0.7.2 mempunyai laporan pengguna bagi satu skor Bola Sepak server-confirmed.
+
 npm install
 npm test
-Tiada akaun atau data sekolah sebenar digunakan dalam ujian.
