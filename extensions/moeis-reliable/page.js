@@ -22,13 +22,14 @@ function read(doc,ctx){
 function inspect(ctx){if(C.route(location.href)!==ctx.url)throw Error('Halaman berubah.');const r=read(document,ctx);return {fields:r.fields,identity:r.identity};}
 function apply(ctx,expected){
  const r=read(document,ctx);
- if(C.route(location.href)!==ctx.url||JSON.stringify(r.identity)!==JSON.stringify(expected.identity)||JSON.stringify(r.fields)!==JSON.stringify(expected.fields))throw Error('Borang berubah sejak pratonton. Semak semula.');
+ if(C.route(location.href)!==ctx.url)throw Error('Alamat borang berubah sejak pratonton. Semak semula.');
+ const changed=C.changes(r,expected);if(changed.length)throw Error('Borang berubah sejak pratonton: '+changed.join(', ')+'. Semak semula.');
  const buttons=[...r.form.querySelectorAll('button,input[type=submit]')].filter(e=>!e.disabled&&/^(simpan|save)$/i.test((e.textContent||e.value||'').trim()));
  if(buttons.length!==1||buttons[0].type!=='submit'||!r.form.checkValidity())throw Error('Butang Simpan / medan wajib belum sah.');
  // Validate everything before modifying the first score.
  for(const f of r.fields){const e=[...r.form.querySelectorAll('input[type=radio]')].find(e=>e.name===f.name&&e.value===f.value);e.checked=true;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}
  const after=read(document,ctx);
- if(JSON.stringify(after.identity)!==JSON.stringify(r.identity)||after.fields.some(f=>f.current!==f.value))throw Error('Identiti / skor berubah selepas isi. Tidak dihantar.');
+ if(!C.same(after.identity,r.identity)||after.fields.some(f=>f.current!==f.value))throw Error('Identiti / skor berubah selepas isi. Tidak dihantar.');
  r.form.requestSubmit(buttons[0]);return {submitted:true};
 }
 async function verify(ctx,expected){
@@ -36,7 +37,7 @@ async function verify(ctx,expected){
  const res=await fetch(ctx.url,{credentials:'same-origin',cache:'no-store',redirect:'follow'});
  if(!res.ok||C.route(res.url)!==ctx.url)throw Error('Respons pelayan / laluan berubah.');
  const doc=new DOMParser().parseFromString(await res.text(),'text/html'),r=read(doc,ctx);
- if(JSON.stringify(r.identity)!==JSON.stringify(expected.identity))throw Error('Identiti respons pelayan berbeza.');
+ if(!C.same(r.identity,expected.identity))throw Error('Identiti respons pelayan berbeza.');
  return {ok:r.fields.every(f=>f.current===f.value),fields:r.fields};
 }
 globalThis.ReliablePage={inspect,apply,verify};
