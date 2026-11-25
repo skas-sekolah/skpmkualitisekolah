@@ -1,25 +1,45 @@
-# SK@S → MOEIS berpandu 0.7.1
+# SK@S → MOEIS berpandu 0.7.2
 
-Versi pembangunan berasingan untuk menguji satu borang Pengurusan Kami yang betul sebelum menyambung pengisian pukal. Tidak mengubah aplikasi SK@S atau akaun.
+## Pembetulan versi ini
+Perbandingan pratonton menggunakan nilai data, bukan susunan kunci objek.
+Susunan kunci yang berubah semasa pemindahan mesej Chrome tidak lagi
+menyebabkan amaran palsu Borang berubah sejak pratonton.
+Perubahan nilai skor, bilangan medan, alamat atau identiti borang sebenar
+masih menyekat penghantaran. Mesej ralat menyenaraikan medan yang berubah.
 
 ## Pasang
-Nyahaktifkan versi lama. Muat turun ZIP cabang ini, extract, buka chrome://extensions → Developer mode → Load unpacked → pilih folder extensions/moeis-reliable (folder manifest.json).
+1. Extract ZIP ke folder baharu.
+2. Nyahaktifkan versi lama di chrome://extensions.
+3. Hidupkan Developer mode, pilih Load unpacked.
+4. Pilih folder yang terus mengandungi manifest.json.
+5. Pastikan versi 0.7.2; muat semula tab MOEIS.
 
-## Guna
-1. Log masuk MOEIS sendiri. Buka standard melalui menu sebenar; untuk unit, klik ikon pensel unit.
-2. Buka extension, pilih pakej JSON SK@S dan rekod sumber.
-3. Tekan Semak borang semasa. Semak laluan, nombor standard, nama unit dan setiap skor.
-4. Tandakan pengesahan, tekan Isi, Simpan dan Sahkan.
-5. Tunggu hasil. Popup boleh ditutup; jangan navigasi tab atau tutup pelayar ketika semakan.
-6. Muat turun laporan; buka semula borang melalui menu MOEIS untuk pengesahan bebas.
+## Ujian satu borang
+Buka borang sebenar melalui menu MOEIS atau ikon pensel.
+Pilih pakej SKAS_KE_MOEIS...json, bukan fail laporan extension.
+Pilih rekod yang sama dengan borang MOEIS, contohnya 3.2.4.1 · BOLA SEPAK.
+Tekan Semak borang semasa. Semak nama unit, standard dan skor dalam pratonton.
+Jangan ubah/navigasi halaman selepas pratonton.
+Tandakan pengesahan dan tekan Isi, Simpan dan Sahkan.
+Tunggu keputusan semakan pelayan. Muat turun laporan.
+Buka semula borang melalui menu MOEIS untuk semakan bebas.
 
-Hanya skor tersedia (termasuk 0) diubah. Skor kosong tidak diisi. Simpan dihantar sekali. Laporan disahkan hanya apabila HTML daripada GET baharu dengan cache no-store menunjukkan pilihan skor yang sepadan pada identiti borang sama. Jika pelayan menjana skor melalui JavaScript, atau destinasi/identiti berubah, status kekal belum disahkan.
+## Maksud pengesahan
+Simpan dihantar sekali. Respons HTML pelayan dibaca dengan cache no-store.
+Skor dalam DOM yang diubah extension bukan bukti simpanan.
+Jika skor belum sepadan atau identiti berubah, laporan kekal unconfirmed.
+Popup boleh ditutup; semakan diteruskan dalam background selagi tab/pelayar
+dan extension kekal tersedia. Elakkan menukar tab sasaran semasa proses.
 
-Nama unit mesti diperiksa pengguna; versi ini tidak melakukan padanan nama automatik atau pengisian pukal. Tidak melaporkan peratus keseluruhan sekolah. Tiada kata laluan, token atau data sekolah sebenar dalam kod. JSON dipegang dalam memori popup. Laporan hanya rekod terakhir disimpan pada peranti.
+## Status
+Ujian Node laluan/skor, argumen suntikan Chrome dan fixture DOM lulus.
+Fixture menghasilkan semula kegagalan perbandingan susunan kunci versi lama,
+dan memastikan nilai skor/identiti yang benar-benar berubah tetap ditolak.
+Pemasangan Chrome sebenar dan simpanan MOEIS versi ini belum disahkan.
+Belum menyokong pengisian pukal; tujuan semasa ialah membuktikan satu borang
+yang betul dapat disimpan sebelum automasi pukal diteruskan.
 
-## Status ujian
-Ujian Node untuk laluan/skor dan regresi argumen Chrome telah lulus. Semua fail JavaScript lulus semakan sintaks. Integrasi Chrome dan simpanan pelayan MOEIS BELUM diuji; bukan pengganti stabil bagi versi lama sehingga ujian borang sebenar disahkan. Fail ini ialah sumber pembangunan, bukan bukti simpanan berjaya.
-
-
-## Pembetulan 0.7.1
-Argumen kosong kepada chrome.scripting.executeScript kini dihantar sebagai null, bukan undefined. Ini membetulkan ralat args index 2: Value is unserializable ketika Semak borang semasa. Ujian: node tests/core.test.cjs dan node tests/background.test.cjs. Pengesahan simpanan MOEIS sebenar masih diperlukan.
+## Ujian pembangunan
+npm install
+npm test
+Tiada akaun atau data sekolah sebenar digunakan dalam ujian.
