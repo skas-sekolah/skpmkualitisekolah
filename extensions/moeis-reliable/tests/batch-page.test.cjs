@@ -1,0 +1,11 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const url='https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard3-2/index?tahun=2026&no_aspek=3.2.4';
+const dom=new JSDOM('<table><tr><th>Bil</th><th>Unit</th><th>3.2.4.1</th><th>Tindakan</th></tr><tr><td>1</td><td>BOLA SEPAK (SR)</td><td>-</td><td><a href="list?tahun=2026&id_aspek=85&id_kokurikulum=270&kod_kat_kokurikulum=SP">✎</a></td></tr></table>',{url,runScripts:'outside-only'});
+for(const f of ['core.js','batch-page.js'])dom.window.eval(fs.readFileSync(path.join(__dirname,'..',f),'utf8'));
+const records=[{id:'3.2.4.1:football',title:'3.2.4.1 · BOLA SEPAK',fields:[]},{id:'3.2.4.1:netball',title:'3.2.4.1 · BOLA JARING',fields:[]}];
+let r=dom.window.ReliableBatchPage.extract(dom.window.document,url,records);
+assert.equal(r.targets.length,1);assert.equal(r.targets[0].id,records[0].id);assert(r.targets[0].url.includes('id_kokurikulum=270'));
+r=dom.window.ReliableBatchPage.extract(dom.window.document,url,[...records,{...records[0],id:'3.2.4.1:duplicate'}]);assert.equal(r.targets.length,0);
+dom.window.document.querySelector('th:nth-child(3)').textContent='3.2.3.1';
+r=dom.window.ReliableBatchPage.extract(dom.window.document,url,records);assert.equal(r.targets.length,0);
+dom.window.close();console.log('PASS: icon row is bound to exact source standard/name/observed URL; duplicate names and other standards are not guessed.');
