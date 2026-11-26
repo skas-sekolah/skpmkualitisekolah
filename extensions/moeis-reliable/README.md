@@ -1,4 +1,4 @@
-# SK@S → MOEIS v0.8.4
+# SK@S → MOEIS v0.8.5
 ## Rumusan terus dalam extension
 Popup dan halaman berkelompok memaparkan peratus skor yang disahkan pada pelayan, bilangan simpanan baharu, skor lama sepadan, rekod kosong, sedia, bermasalah dan belum diproses. Pecahan masalah boleh dibuka untuk melihat nama rekod, sebab dan calon pautan. Mod semakan tidak dikira sebagai simpanan baharu.
 
@@ -9,8 +9,13 @@ Carian menyokong nama panitia sebagai pautan, pengepala jadual berbilang baris (
 
 Eksport JSON SK@S baharu selepas pembetulan nama. Bahasa Elektif tidak ditukar kepada Bahasa Arab secara umum oleh extension kerana maknanya mungkin berbeza antara sekolah.
 
+## Ralat rangkaian v0.8.5
+Carian bermula daripada halaman MOEIS yang sudah terbuka. Bacaan ini digunakan untuk mendapatkan pautan sahaja; ia bukan bukti simpanan. Jika permintaan halaman seterusnya gagal dengan ralat rangkaian, proses berhenti dan laporan menyatakan carian terganggu, bukan melabel semua nama atau pautan sebagai salah. Pengesahan simpanan masih memerlukan respons baharu pelayan.
+
+Laporan lama yang gagal pada halaman pertama tanpa sebarang baris unit dipaparkan sebagai rekod belum diperiksa. Fail asal tidak diubah. Perubahan ini tidak membuktikan punca rangkaian (sesi, sambungan, sekatan laman atau polisi pelayar).
+
 ## Pemasangan
-Muat turun SKAS-MOEIS-Extension-v0.8.4.zip dan ekstrak. Dalam chrome://extensions, aktifkan Developer mode, pilih Load unpacked dan pilih folder yang mengandungi manifest.json. Matikan versi lama supaya satu extension sahaja digunakan.
+Muat turun SKAS-MOEIS-Extension-v0.8.5.zip dan ekstrak. Dalam chrome://extensions, aktifkan Developer mode, pilih Load unpacked dan pilih folder yang mengandungi manifest.json. Matikan versi lama supaya satu extension sahaja digunakan.
 
 ## Pembaikan pengesanan v0.8.2
 Pengesanan kod standard menyokong badge pautan JavaScript, pautan yang berbeza parameter daripada URL semasa, DIV dengan teks berpecah dan input button. Kod daripada sidebar, elemen tersembunyi dan kandungan selepas borang tidak digunakan. Jika beberapa kod wujud, kod aktif / pautan semasa mesti menentukan satu kod sahaja; jika tidak, pengisian tetap disekat. Ujian menyerupai paparan pengguna, bukan salinan HTML MOEIS sebenar.

@@ -2,8 +2,8 @@ importScripts('batch-core.js');
 let batchStop=false;
 async function discoverBatch(ctx,pack){
  await chrome.scripting.executeScript({target:{tabId:ctx.tabId},files:['core.js','batch-page.js']});
- const [r]=await chrome.scripting.executeScript({target:{tabId:ctx.tabId},func:async(ctx,pack)=>{try{return {ok:true,data:await ReliableBatchPage.discover(ctx,pack)};}catch(e){return {ok:false,error:e.message};}},args:[ctx,pack]});
- if(!r?.result?.ok)throw Error(r?.result?.error||'Carian gagal.');return r.result.data;
+ const [r]=await chrome.scripting.executeScript({target:{tabId:ctx.tabId},func:async(ctx,pack)=>{try{return {ok:true,data:await ReliableBatchPage.discover(ctx,pack)};}catch(e){return {ok:false,error:e.message,discovery:e.discovery||null};}},args:[ctx,pack]});
+ if(!r?.result?.ok){const error=Error(r?.result?.error||'Carian gagal.');error.discovery=r?.result?.discovery||null;throw error;}return r.result.data;
 }
 async function navigateBatch(ctx){
  await chrome.tabs.update(ctx.tabId,{url:ctx.url});
@@ -32,7 +32,7 @@ async function resolveBatchCandidates(tabId,record,pack,candidates,result){
 }
 
 async function runBatch(tabId,pack,mode){
- batchStop=false;const records=pack.modules.management.records,job={version:'0.8.4',schoolCode:pack.schoolCode,year:pack.year,mode,groups:[...new Set(records.map(r=>r.group||'management'))],running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
+ batchStop=false;const records=pack.modules.management.records,job={version:'0.8.5',schoolCode:pack.schoolCode,year:pack.year,mode,groups:[...new Set(records.map(r=>r.group||'management'))],running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
  const persist=async()=>{job.summary=ReliableBatchCore.totals(records,job.results);job.updatedAt=new Date().toISOString();await chrome.storage.local.set({reliableBatch:job});};
  try{
   await persist();const tab=await chrome.tabs.get(tabId),base=ReliableCore.route(tab.url);
@@ -77,6 +77,6 @@ async function runBatch(tabId,pack,mode){
    delete job.pending;job.results.push(result);await persist();
   }
   job.status=batchStop?'stopped':'completed';job.message=batchStop?'Dihentikan. Semak rekod terakhir.':'Proses selesai. Semak peratus disahkan dan rekod dilangkau.';
- }catch(e){job.status='error';job.message=e.message;}
+ }catch(e){job.status='error';job.message=e.message;if(e.discovery)job.discovery=e.discovery;}
  finally{job.running=false;running=false;await persist();}
 }

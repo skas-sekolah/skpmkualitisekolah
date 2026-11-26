@@ -6,8 +6,8 @@ async function show(){
  $('start').disabled=!!live?.running;for(const id of ['file','part','mode','confirm'])$(id).disabled=!!live?.running;
  if(!j)return;
  $('status').textContent=importedReport?'Paparan laporan diimport — tidak menjalankan pengisian':j.message;
- const m=ReliableReport.model(j);$('summary').textContent='Skor disahkan '+m.scores+'/'+m.source+' ('+(m.percent===null?'—':m.percent+'%')+') · Rekod diproses '+m.rows.length+'/'+m.total;
- $('meter').value=m.total?m.rows.length/m.total*100:0;
+ const m=ReliableReport.model(j);$('summary').textContent='Skor disahkan '+m.scores+'/'+m.source+' ('+(m.percent===null?'—':m.percent+'%')+') · Rekod diproses '+m.processed+'/'+m.total;
+ $('meter').value=m.total?m.processed/m.total*100:0;
  $('log').textContent=m.rows.map(r=>r.title+' · '+(labels[r.status]||r.status)+' · '+r.message).join('\n');
 }
 $('report-file').onchange=async()=>{try{const f=$('report-file').files[0];if(!f||f.size>8000000)throw Error('Pilih laporan JSON bawah 8 MB.');importedReport=ReliableReport.decodeReport(await f.text());await show();}catch(e){$('status').textContent=e.message;}};
@@ -25,5 +25,5 @@ $('start').onclick=async()=>{try{
  importedReport=null;$('start').disabled=true;const r=await chrome.runtime.sendMessage({type:'bulk-start',tabId,pack:selected,mode:$('mode').value});if(!r.ok)throw Error(r.error);
  }catch(e){$('status').textContent=e.message;$('start').disabled=false;}};
 $('stop').onclick=async()=>{await chrome.runtime.sendMessage({type:'bulk-stop'});$('status').textContent='Menunggu rekod / carian semasa selesai…';};
-$('report').onclick=async()=>{const {reliableBatch:live}=await chrome.storage.local.get('reliableBatch'),j=importedReport||live,url=URL.createObjectURL(new Blob([JSON.stringify({version:'0.8.4',batch:j||null},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='SKAS-laporan-berkelompok.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('report').onclick=async()=>{const {reliableBatch:live}=await chrome.storage.local.get('reliableBatch'),j=importedReport||live,url=URL.createObjectURL(new Blob([JSON.stringify({version:'0.8.5',batch:j||null},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='SKAS-laporan-berkelompok.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 chrome.storage.onChanged.addListener(()=>void show());void show();

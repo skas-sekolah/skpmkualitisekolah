@@ -62,10 +62,15 @@ async function discover(ctx,pack){
  const started=Date.now();while(queue.length&&seen.size<260&&Date.now()-started<240000){
   const url=queue.shift();if(seen.has(url))continue;seen.add(url);
   try{
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
-   let res;try{res=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:controller.signal});}finally{clearTimeout(timer);}
-   if(!res.ok||C.route(res.url)!==C.route(url))throw Error('Respons / alamat berubah.');
-   const doc=new DOMParser().parseFromString(await res.text(),'text/html');
+   let doc;
+   // Discovery can read the already-open page. This is never proof of saved scores.
+   if(url===ctx.url&&C.route(location.href)===url)doc=document;
+   else{
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    let res;try{res=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:controller.signal});}finally{clearTimeout(timer);}
+    if(!res.ok||C.route(res.url)!==C.route(url))throw Error('Respons / alamat berubah.');
+    doc=new DOMParser().parseFromString(await res.text(),'text/html');
+   }
    if(doc.querySelector('input[type=password]'))throw Error('Sesi MOEIS tamat.');
    const school=String(pack.schoolCode).replace(/[^A-Z0-9-]/gi,'');
    if(!school||!new RegExp('(^|[^A-Z0-9])'+school+'([^A-Z0-9]|$)','i').test(doc.body.textContent))throw Error('Kod sekolah tidak sepadan.');
@@ -76,7 +81,15 @@ async function discover(ctx,pack){
     if(scope&&unitKey(link)===unitKey(url)){scopes.set(link,scope);enqueue(link);}
     else if(records.some(r=>u.pathname.includes('/'+C.group(r.id.split(':')[0])+'/'))&&!unitKey(link))enqueue(link);
    }
-  }catch(e){if(/Sesi|sekolah/.test(e.message))throw e;warnings.push({path:new URL(url).pathname,message:e.message});}
+  }catch(e){
+   if(/Sesi|sekolah/.test(e.message))throw e;
+   if(e.name==='AbortError'||/Failed to fetch|NetworkError|Load failed|fetch failed|net::/i.test(e.message)){
+    warnings.push({path:new URL(url).pathname,message:e.message,type:'network'});
+    const failure=Error('Carian dihentikan kerana permintaan halaman MOEIS gagal: '+e.message+'. Rekod yang belum diperiksa tidak dianggap salah nama atau tiada pautan.');
+    failure.discovery={visited:seen.size,warnings,unitRows,diagnostics,interrupted:true};throw failure;
+   }
+   warnings.push({path:new URL(url).pathname,message:e.message});
+  }
  }
  if(queue.length)warnings.push({message:'Had carian halaman / masa dicapai; rekod tanpa pautan akan dilangkau.'});
  return {targets,visited:seen.size,warnings,unitRows,diagnostics};
