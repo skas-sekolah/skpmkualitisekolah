@@ -37,16 +37,16 @@ jobs:
           with zipfile.ZipFile(output) as archive:
               assert 'manifest.json' in archive.namelist()
               manifest = json.loads(archive.read('manifest.json'))
-              for required in (manifest['background']['service_worker'], manifest['action']['default_popup'], 'core.js', 'page.js', 'batch.html', 'batch-runner.js', 'batch-core.js', 'batch-page.js', 'batch-ui.js', 'popup.js'):
+              for required in (manifest['background']['service_worker'], manifest['action']['default_popup'], 'core.js', 'page.js', 'batch.html', 'batch-runner.js', 'batch-core.js', 'batch-page.js', 'batch-ui.js', 'popup.js', 'report-summary.js', 'report-summary.css'):
                   assert required in archive.namelist(), required
           print(output)
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: SKAS-MOEIS-Extension-v0.8.2
-          path: SKAS-MOEIS-Extension-v0.8.2.zip
+          name: SKAS-MOEIS-Extension-v0.8.3
+          path: SKAS-MOEIS-Extension-v0.8.3.zip
       - name: Publish tested extension download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create moeis-v0.8.2 SKAS-MOEIS-Extension-v0.8.2.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.2" --notes "Regression-tested route candidate validation and main-content heading checks. Live MOEIS persistence has not been tested from the build environment."
+          gh release create moeis-v0.8.3 SKAS-MOEIS-Extension-v0.8.3.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.3" --notes "Shows verified percentage, result counts and grouped problems directly in popup and batch dashboard. Regression tests passed. Live MOEIS persistence has not been tested from the build environment."

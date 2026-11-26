@@ -1,9 +1,9 @@
 {
   "name": "skas-moeis-reliable",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.8.3",
   "scripts": {
-    "test": "node tests/core.test.cjs && node tests/background.test.cjs && node tests/snapshot.test.cjs && node tests/batch.test.cjs && node tests/batch-page.test.cjs && node tests/route-selection.test.cjs && node tests/heading.test.cjs && node tests/criterion-marker.test.cjs"
+    "test": "node tests/core.test.cjs && node tests/background.test.cjs && node tests/snapshot.test.cjs && node tests/batch.test.cjs && node tests/batch-page.test.cjs && node tests/route-selection.test.cjs && node tests/heading.test.cjs && node tests/criterion-marker.test.cjs && node tests/report-summary.test.cjs && node tests/report-ui.test.cjs"
   },
   "devDependencies": {
     "jsdom": "29.0.1"
