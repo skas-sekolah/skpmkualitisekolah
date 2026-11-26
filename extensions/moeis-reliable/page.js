@@ -1,11 +1,30 @@
 (()=>{
 const C=ReliableCore;
+// MOEIS criterion badges can be anchors, nested spans, DIVs or input buttons.
+// A criterion link need not equal the current URL (e.g. JavaScript badges).
+// Resolve selected/current badges first; otherwise require exactly one content code.
+function standardMarkers(doc,form,url,standard){
+ const records=[],depth=standard.split('.').length;
+ for(const e of doc.querySelectorAll('p,td,th,button,h1,h2,h3,h4,span,a,div,label,strong,b,input[type=button],input[type=submit]')){
+  if(e.closest('nav,aside,header,.sidebar,.menu,.breadcrumb,[role=navigation],[hidden],[aria-hidden=true],script,style')||e.querySelector('table,form,input[type=radio]'))continue;
+  if(!form.contains(e)&&!(e.compareDocumentPosition(form)&4))continue;
+  const text=String(e.matches('input')?e.value:e.textContent).replace(/\s+/g,' ').trim();
+  if(text.length>300)continue;
+  const code=text.match(/^([123](?:\.\d+){2,3})(?:\s|$)/)?.[1];
+  if(!code||code.split('.').length!==depth)continue;
+  const link=e.closest('a[href]');let current=false;
+  if(link){try{current=C.route(new URL(link.getAttribute('href'),url).href)===url;}catch{}}
+  const selected=!!e.closest('[aria-current=page],[aria-selected=true],.active');
+  records.push({code,current,selected});
+ }
+ const selected=records.filter(r=>r.selected),current=records.filter(r=>r.current);
+ return [...new Set((selected.length?selected:current.length?current:records).map(r=>r.code))];
+}
 function read(doc,ctx){
  C.context(ctx.url,ctx.record,ctx.year);
  if(doc.querySelector('input[type=password]'))throw Error('Sesi MOEIS tamat.');
  if(!new RegExp('(^|[^A-Z0-9])'+String(ctx.schoolCode).replace(/[^A-Z0-9-]/gi,'')+'([^A-Z0-9]|$)','i').test(doc.body.textContent))throw Error('Kod sekolah tidak dapat disahkan.');
  const standard=ctx.record.id.split(':')[0],major=standard.startsWith('3.')?standard.split('.').slice(0,2).join('.'):standard.split('.')[0];
- const text=doc.body.textContent.replace(/\s+/g,' ');
  // Read the STANDARD content row / heading, excluding navigation menu text.
  const primary=[...doc.querySelectorAll('tr')].flatMap(row=>{
   const cells=[...row.cells];return cells.length>=2&&/^STANDARD$/i.test(cells[0].textContent.trim())?[cells[1].textContent]:[];
@@ -13,15 +32,11 @@ function read(doc,ctx){
  const headingTexts=primary.length?primary:[...doc.querySelectorAll('h1,h2,h3,h4')].filter(e=>!e.closest('nav,aside,header,a')).map(e=>e.textContent);
  const headings=headingTexts.map(t=>t.trim().match(/^STANDARD\s+([123](?:\.[123])?)\s*:/i)?.[1]).filter(Boolean);
  if(!headings.length||headings.some(h=>h!==major))throw Error('Tajuk standard kandungan tidak sepadan / tidak dapat disahkan.');
- const hint=[...doc.querySelectorAll('p,td,th,button,h1,h2,h3,h4,span,a')].some(e=>{
-  if(e.closest('nav,aside,header')||e.querySelector('table,form'))return false;
-  if(e.matches('a[href]')){try{if(C.route(new URL(e.getAttribute('href'),ctx.url).href)!==ctx.url)return false;}catch{return false;}}
-  return new RegExp('^'+standard.replace(/\./g,'\\.')+'(?:\\s|$)').test(e.textContent.trim());
- });
- if(!hint)throw Error('Nombor standard sumber tidak ditemui pada kandungan borang.');
- if(ctx.unitName&&!([...doc.querySelectorAll('td,th,p,h1,h2,h3,h4')].some(e=>!e.querySelector('table,form')&&!e.closest('nav,aside,header')&&C.unitName(e.textContent)===C.unitName(ctx.unitName))))throw Error('Nama unit pada borang tidak sepadan.');
  const forms=[...doc.querySelectorAll('form')].filter(f=>f.querySelector('input[type=radio][name^=skor]'));
  if(forms.length!==1)throw Error('Borang skor tunggal tidak ditemui.');
+ const markerCodes=standardMarkers(doc,forms[0],ctx.url,standard);
+ if(markerCodes.length!==1||markerCodes[0]!==standard)throw Error('Nombor standard sumber tidak sepadan / belum dapat disahkan. Dipilih: '+standard+'. Kod kandungan: '+(markerCodes.join(', ')||'tiada')+'.');
+ if(ctx.unitName&&!([...doc.querySelectorAll('td,th,p,h1,h2,h3,h4')].some(e=>!e.querySelector('table,form')&&!e.closest('nav,aside,header')&&C.unitName(e.textContent)===C.unitName(ctx.unitName))))throw Error('Nama unit pada borang tidak sepadan.');
  const form=forms[0],action=new URL(form.getAttribute('action')||ctx.url,ctx.url);
  if(action.origin!==new URL(ctx.url).origin||!action.pathname.includes('/'+C.group(standard)+'/')||String(form.method).toLowerCase()!=='post')throw Error('Destinasi Simpan tidak sepadan.');
  const fields=C.scores(ctx.record);if(!fields.length)throw Error('Tiada skor sumber.');

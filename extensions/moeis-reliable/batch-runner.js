@@ -32,7 +32,7 @@ async function resolveBatchCandidates(tabId,record,pack,candidates,result){
 }
 
 async function runBatch(tabId,pack,mode){
- batchStop=false;const records=pack.modules.management.records,job={version:'0.8.1',running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
+ batchStop=false;const records=pack.modules.management.records,job={version:'0.8.2',running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
  const persist=async()=>{job.summary=ReliableBatchCore.totals(records,job.results);job.updatedAt=new Date().toISOString();await chrome.storage.local.set({reliableBatch:job});};
  try{
   await persist();const tab=await chrome.tabs.get(tabId),base=ReliableCore.route(tab.url);

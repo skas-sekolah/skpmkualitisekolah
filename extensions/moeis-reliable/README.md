@@ -1,8 +1,11 @@
-# SK@S → MOEIS v0.8.1
+# SK@S → MOEIS v0.8.2
 ## Pemasangan
-Muat turun SKAS-MOEIS-Extension-v0.8.1.zip dan ekstrak. Dalam chrome://extensions, aktifkan Developer mode, pilih Load unpacked dan pilih folder yang mengandungi manifest.json. Matikan versi lama supaya satu extension sahaja digunakan.
+Muat turun SKAS-MOEIS-Extension-v0.8.2.zip dan ekstrak. Dalam chrome://extensions, aktifkan Developer mode, pilih Load unpacked dan pilih folder yang mengandungi manifest.json. Matikan versi lama supaya satu extension sahaja digunakan.
 
-## Perubahan
+## Pembaikan v0.8.2
+Pengesanan kod standard menyokong badge pautan JavaScript, pautan yang berbeza parameter daripada URL semasa, DIV dengan teks berpecah dan input button. Kod daripada sidebar, elemen tersembunyi dan kandungan selepas borang tidak digunakan. Jika beberapa kod wujud, kod aktif / pautan semasa mesti menentukan satu kod sahaja; jika tidak, pengisian tetap disekat. Ujian menyerupai paparan pengguna, bukan salinan HTML MOEIS sebenar.
+
+## Perubahan terdahulu
 - Calon pautan dibaca dengan GET dahulu. Halaman senarai tanpa borang ditolak; beberapa pautan kepada identiti borang sama boleh disatukan. Jika identiti berlainan, rekod tetap dilangkau.
 - Tajuk STANDARD disahkan daripada jadual kandungan atau heading utama, bukan teks menu di seluruh halaman.
 - Nama RBT dan PJPK dipadankan kepada nama penuh yang diperhatikan dalam MOEIS. Bahasa Elektif tidak dianggap Bahasa Arab secara automatik.

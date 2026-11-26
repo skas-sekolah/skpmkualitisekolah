@@ -17,7 +17,7 @@ jobs:
           node-version: '24'
       - name: Install extension test dependencies
         working-directory: extensions/moeis-reliable
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Syntax and regression tests
         working-directory: extensions/moeis-reliable
         run: |
@@ -43,10 +43,10 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: SKAS-MOEIS-Extension-v0.8.1
-          path: SKAS-MOEIS-Extension-v0.8.1.zip
+          name: SKAS-MOEIS-Extension-v0.8.2
+          path: SKAS-MOEIS-Extension-v0.8.2.zip
       - name: Publish tested extension download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create moeis-v0.8.1 SKAS-MOEIS-Extension-v0.8.1.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.1" --notes "Regression-tested route candidate validation and main-content heading checks. Live MOEIS persistence has not been tested from the build environment."
+          gh release create moeis-v0.8.2 SKAS-MOEIS-Extension-v0.8.2.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.2" --notes "Regression-tested route candidate validation and main-content heading checks. Live MOEIS persistence has not been tested from the build environment."
