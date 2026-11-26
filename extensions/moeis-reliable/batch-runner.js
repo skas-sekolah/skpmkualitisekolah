@@ -32,12 +32,12 @@ async function resolveBatchCandidates(tabId,record,pack,candidates,result){
 }
 
 async function runBatch(tabId,pack,mode){
- batchStop=false;const records=pack.modules.management.records,job={version:'0.8.3',schoolCode:pack.schoolCode,year:pack.year,mode,groups:[...new Set(records.map(r=>r.group||'management'))],running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
+ batchStop=false;const records=pack.modules.management.records,job={version:'0.8.4',schoolCode:pack.schoolCode,year:pack.year,mode,groups:[...new Set(records.map(r=>r.group||'management'))],running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
  const persist=async()=>{job.summary=ReliableBatchCore.totals(records,job.results);job.updatedAt=new Date().toISOString();await chrome.storage.local.set({reliableBatch:job});};
  try{
   await persist();const tab=await chrome.tabs.get(tabId),base=ReliableCore.route(tab.url);
   const found=await discoverBatch({tabId,url:base},pack),routes=ReliableBatchCore.uniqueRoutes(found.targets);
-  job.discovery={visited:found.visited,warnings:found.warnings,unitRows:found.unitRows};job.status='filling';
+  job.discovery={visited:found.visited,warnings:found.warnings,unitRows:found.unitRows,diagnostics:found.diagnostics||[]};job.status='filling';
   const claimed=new Map();
   for(const record of records){
    if(batchStop)break;const count=ReliableCore.scores(record).length;
@@ -47,6 +47,11 @@ async function runBatch(tabId,pack,mode){
     if(record.readOnly||!count){result.status='empty-skipped';result.message='Tiada skor boleh diisi / rekod rujukan.';}
     else{
      const candidates=[...(routes.get(record.id)?.values()||[])];
+     if(!candidates.length&&record.id.startsWith('3.1.2.')){
+      const name=ReliableCore.unitName(record.title),standard=record.id.split(':')[0];
+      result.discovery={nameSeen:found.unitRows.some(r=>r.standard===standard&&ReliableCore.unitName(r.unit)===name),pages:(found.diagnostics||[]).filter(p=>ReliableCore.unitName(p.unit)===name)};
+      if(result.discovery.nameSeen)throw Error('Pautan borang standard tidak ditemui; nama panitia telah dikenal pasti.');
+     }
      const {ctx,snapshot}=await resolveBatchCandidates(tabId,record,pack,candidates,result);
      const identityKey=JSON.stringify({group:ReliableCore.group(record.id.split(':')[0]),identity:snapshot.identity});
      if(claimed.has(ctx.url)||snapshot.identity.length&&claimed.has(identityKey))throw Error('Borang yang sama sudah dipadankan dengan rekod lain.');

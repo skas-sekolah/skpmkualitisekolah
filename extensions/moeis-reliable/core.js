@@ -1,6 +1,6 @@
 (()=>{
 const origin='https://moeisins.moe.gov.my';
-function route(raw){const u=new URL(raw);if(u.origin!==origin||!u.pathname.startsWith('/SJN/penilaian-kendiri/pengurusan-kami/')||/save|delete|hapus|logout/i.test(u.pathname))throw Error('Buka borang Pengurusan Kami yang betul.');u.hash='';u.searchParams.sort();return u.href;}
+function route(raw){const u=new URL(raw);if(u.origin!==origin||!u.pathname.startsWith('/SJN/penilaian-kendiri/pengurusan-kami/')||/save|delete|hapus|logout/i.test(u.pathname))throw Error('Buka borang Pengurusan Kami yang betul.');if([...u.searchParams].some(([k,v])=>/(?:^|_)(delete|hapus|logout)(?:$|_)/i.test(k)||/^(action|operation|op|task|do|r)$/i.test(k)&&/(?:^|[\/_-])(save|delete|hapus|logout)(?:$|[\/_-])/i.test(v)))throw Error('Pautan tindakan perubahan data tidak digunakan untuk carian.');u.hash='';u.searchParams.sort();return u.href;}
 function group(code){return code.startsWith('3.')?'standard'+code.split('.').slice(0,2).join('-'):'standard'+code.split('.')[0];}
 function context(url,record,year){
  const u=new URL(route(url)),code=record.id.split(':')[0];

@@ -43,10 +43,10 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: SKAS-MOEIS-Extension-v0.8.3
-          path: SKAS-MOEIS-Extension-v0.8.3.zip
+          name: SKAS-MOEIS-Extension-v0.8.4
+          path: SKAS-MOEIS-Extension-v0.8.4.zip
       - name: Publish tested extension download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create moeis-v0.8.3 SKAS-MOEIS-Extension-v0.8.3.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.3" --notes "Shows verified percentage, result counts and grouped problems directly in popup and batch dashboard. Regression tests passed. Live MOEIS persistence has not been tested from the build environment."
+          gh release create moeis-v0.8.4 SKAS-MOEIS-Extension-v0.8.4.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.4" --notes "Adds observed-link discovery for shared panitia unit pages and multirow table headers; retains dashboard reporting. Regression tests passed. Live MOEIS persistence has not been tested from the build environment."

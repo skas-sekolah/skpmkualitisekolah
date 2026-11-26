@@ -1,0 +1,18 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..'),base='https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard3-1/',start=base+'index?no_aspek=3.1.2&tahun=2026',landing=base+'list?id_panitia=42&tahun=2026';
+const records=[1,2,3,4].map(i=>({id:'3.1.2.'+i+':arabic',title:'3.1.2.'+i+' · BAHASA ARAB',fields:[{key:'scores.a',value:4}]}));
+const table='<table><thead><tr><th rowspan="2">Bil</th><th rowspan="2">Panitia Mata Pelajaran</th><th colspan="4">Pengurusan Panitia</th><th rowspan="2">Tindakan</th></tr><tr>'+[1,2,3,4].map(i=>'<th>3.1.2.'+i+'</th>').join('')+'</tr></thead><tbody><tr><td>1</td><td><a href="'+landing+'">BAHASA ARAB</a></td><td>-</td><td>-</td><td>-</td><td>-</td><td><a href="'+landing+'">✎</a></td></tr></tbody></table>';
+const leaf=i=>base+'list?id_dimensi_std='+(90+i)+'&id_panitia=42&tahun=2026';
+const landingHTML='<h2>BAHASA ARAB</h2>'+[1,2,3,4].map(i=>'<a href="'+leaf(i)+'">3.1.2.'+i+'</a>').join('')+'<a href="'+base+'list?id_panitia=99&tahun=2026">3.1.2.1</a>';
+const dom=new JSDOM('BBA8284 '+table,{url:start,runScripts:'outside-only'}),w=dom.window;
+for(const f of ['core.js','batch-page.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+const B=w.ReliableBatchPage,C=w.ReliableCore;
+assert.throws(()=>C.route(landing+'&action=delete'),/perubahan data/);
+assert.throws(()=>C.route(landing+'&r=controller/delete'),/perubahan data/);
+let first=B.extract(w.document,start,records);assert.equal(first.targets.length,0,'Never assign shared pencil to all four records');assert.equal(first.unitPages.length,1);assert.equal(first.unitPages[0].recordIds.length,4);assert.equal(first.unitRows.length,4);
+let doc=new w.DOMParser().parseFromString(landingHTML,'text/html');let next=B.extract(doc,landing,records,first.unitPages[0]);assert.equal(next.targets.length,4);for(let i=1;i<=4;i++)assert(next.targets.some(t=>t.id===records[i-1].id&&t.url===C.route(leaf(i))));assert(next.targets.every(t=>new URL(t.url).searchParams.get('id_panitia')==='42'));
+const duplicate=[...records,{...records[0],id:'3.1.2.1:duplicate'}];let d=B.extract(doc,landing,duplicate,{...first.unitPages[0],recordIds:duplicate.map(r=>r.id)});assert.equal(d.targets.filter(t=>t.id.startsWith('3.1.2.1:')).length,0,'Duplicate source names must not select either source record');
+const direct='<table><tr><th>Bil</th><th>Panitia Mata Pelajaran</th>'+[1,2,3,4].map(i=>'<th>3.1.2.'+i+'</th>').join('')+'</tr><tr><td>1</td><td>BAHASA ARAB</td>'+[1,2,3,4].map(i=>'<td><a href="'+leaf(i)+'">✎</a></td>').join('')+'</tr></table>';
+doc=new w.DOMParser().parseFromString(direct,'text/html');assert.equal(B.extract(doc,start,records).targets.length,4);
+(async()=>{const visited=[];w.fetch=async url=>{visited.push(url);const u=new URL(url);assert.notEqual(u.searchParams.get('id_panitia'),'99');let html=u.searchParams.has('id_panitia')?(u.searchParams.has('id_dimensi_std')?'<p>Leaf form</p>':landingHTML):table;return {ok:true,url,text:async()=>'BBA8284 '+html};};
+const found=await B.discover({url:C.route(start)},{schoolCode:'BBA8284',year:2026,modules:{management:{records}}});assert.equal(found.visited,6);assert.equal(new Set(found.targets.map(t=>t.id)).size,4);assert.equal(found.diagnostics.filter(d=>d.type==='unit-page').length,5);assert.equal(found.warnings.length,0);w.close();console.log('PASS: shared panitia pencil, linked names, rowspan/colspan headers, four observed criterion links and read-only unit landing crawl; no invented IDs or cross-unit traversal.');})().catch(e=>{console.error(e);process.exit(1);});

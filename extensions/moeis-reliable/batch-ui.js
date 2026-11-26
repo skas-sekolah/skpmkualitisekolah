@@ -25,5 +25,5 @@ $('start').onclick=async()=>{try{
  importedReport=null;$('start').disabled=true;const r=await chrome.runtime.sendMessage({type:'bulk-start',tabId,pack:selected,mode:$('mode').value});if(!r.ok)throw Error(r.error);
  }catch(e){$('status').textContent=e.message;$('start').disabled=false;}};
 $('stop').onclick=async()=>{await chrome.runtime.sendMessage({type:'bulk-stop'});$('status').textContent='Menunggu rekod / carian semasa selesai…';};
-$('report').onclick=async()=>{const {reliableBatch:live}=await chrome.storage.local.get('reliableBatch'),j=importedReport||live,url=URL.createObjectURL(new Blob([JSON.stringify({version:'0.8.3',batch:j||null},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='SKAS-laporan-berkelompok.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('report').onclick=async()=>{const {reliableBatch:live}=await chrome.storage.local.get('reliableBatch'),j=importedReport||live,url=URL.createObjectURL(new Blob([JSON.stringify({version:'0.8.4',batch:j||null},null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='SKAS-laporan-berkelompok.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 chrome.storage.onChanged.addListener(()=>void show());void show();
