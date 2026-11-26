@@ -3,12 +3,12 @@ async function run({review=false,failVerify=false,fatal=false}={}){
  const base='https://moeisins.moe.gov.my/SJN/penilaian-kendiri/pengurusan-kami/standard3-2/list?tahun=2026&id_aspek=85';
  const records=['empty','problem','zero','existing'].map((n,i)=>({id:'3.2.4.1:'+n,title:n,fields:i?[{key:'scores.a',value:i===2?0:4}]:[]}));
  const pack={year:2026,schoolCode:'TEST01',modules:{management:{records}}};let url=base,stored,apply=[],saved=new Set();
- const c={URL,console,setTimeout:fn=>{fn();return 1;},chrome:{runtime:{id:'test',onMessage:{addListener(){}},onStartup:{addListener(){}}},storage:{local:{set:async x=>{if(x.reliableBatch)stored=JSON.parse(JSON.stringify(x.reliableBatch));}}},tabs:{get:async()=>({url,status:'complete'}),update:async(_,p)=>{url=p.url;}},scripting:{executeScript:async x=>{
+ const c={URL,console,setTimeout:fn=>{fn();return 1;},chrome:{runtime:{id:'test',onMessage:{addListener(){}},onStartup:{addListener(){}},onInstalled:{addListener(){}}},storage:{local:{set:async x=>{if(x.reliableBatch)stored=JSON.parse(JSON.stringify(x.reliableBatch));}}},tabs:{get:async()=>({url,status:'complete'}),update:async(_,p)=>{url=p.url;}},scripting:{executeScript:async x=>{
   if(x.files)return [];
   if(typeof x.args[0]==='object')return [{result:{ok:true,data:{targets:records.map((r,i)=>({id:r.id,url:c.ReliableCore.route(base+'&id_kokurikulum='+i)})),visited:1,warnings:[],unitRows:[]}}}];
   const [action,ctx]=x.args,name=ctx.record.title,value=String(ctx.record.fields[0]?.value);
   if(name==='problem')return [{result:{ok:false,error:fatal?'Sesi MOEIS tamat.':'Padanan borang bermasalah.'}}];
-  if(action==='inspect')return [{result:{ok:true,data:{identity:[],fields:[{name:'skor1',value,current:name==='existing'?value:null}]}}}];
+  if(action==='inspect'||action==='probe')return [{result:{ok:true,data:{identity:[],fields:[{name:'skor1',value,current:name==='existing'?value:null}]}}}];
   if(action==='apply'){apply.push(name);saved.add(name);return [{result:{ok:true,data:{submitted:true}}}];}
   if(action==='verify')return [{result:{ok:true,data:{ok:name==='existing'||saved.has(name)&&!failVerify}}}];
  }}}};

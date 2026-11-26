@@ -27,3 +27,11 @@ chrome.runtime.onStartup.addListener(async()=>{const {reliableJob:j}=await chrom
 importScripts('batch-runner.js');
 
 chrome.runtime.onStartup.addListener(async()=>{const {reliableBatch:j}=await chrome.storage.local.get('reliableBatch');if(j?.running){j.running=false;j.status='interrupted';j.message='Pelayar dimulakan semula. Semak rekod terakhir sebelum meneruskan; tiada penghantaran semula automatik.';await chrome.storage.local.set({reliableBatch:j});}});
+
+// Updating the extension also interrupts its worker. Never silently resume a POST.
+chrome.runtime.onInstalled.addListener(async()=>{
+ for(const key of ['reliableJob','reliableBatch']){
+  const state=await chrome.storage.local.get(key),j=state[key];
+  if(j?.running){j.running=false;j.status='interrupted';j.message='Extension dikemas kini. Semak rekod terakhir pada MOEIS sebelum mengulang.';await chrome.storage.local.set({[key]:j});}
+ }
+});

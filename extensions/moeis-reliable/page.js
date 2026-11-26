@@ -6,9 +6,20 @@ function read(doc,ctx){
  if(!new RegExp('(^|[^A-Z0-9])'+String(ctx.schoolCode).replace(/[^A-Z0-9-]/gi,'')+'([^A-Z0-9]|$)','i').test(doc.body.textContent))throw Error('Kod sekolah tidak dapat disahkan.');
  const standard=ctx.record.id.split(':')[0],major=standard.startsWith('3.')?standard.split('.').slice(0,2).join('.'):standard.split('.')[0];
  const text=doc.body.textContent.replace(/\s+/g,' ');
- const headings=[...text.matchAll(/STANDARD\s+([123](?:\.[123])?)\s*:/gi)].map(m=>m[1]);
- if(!headings.includes(major)||headings.some(h=>h!==major))throw Error('Tajuk standard halaman bercampur / tidak sepadan.');
- if(!text.includes(standard))throw Error('Nombor standard sumber tidak ditemui pada halaman.');
+ // Read the STANDARD content row / heading, excluding navigation menu text.
+ const primary=[...doc.querySelectorAll('tr')].flatMap(row=>{
+  const cells=[...row.cells];return cells.length>=2&&/^STANDARD$/i.test(cells[0].textContent.trim())?[cells[1].textContent]:[];
+ });
+ const headingTexts=primary.length?primary:[...doc.querySelectorAll('h1,h2,h3,h4')].filter(e=>!e.closest('nav,aside,header,a')).map(e=>e.textContent);
+ const headings=headingTexts.map(t=>t.trim().match(/^STANDARD\s+([123](?:\.[123])?)\s*:/i)?.[1]).filter(Boolean);
+ if(!headings.length||headings.some(h=>h!==major))throw Error('Tajuk standard kandungan tidak sepadan / tidak dapat disahkan.');
+ const hint=[...doc.querySelectorAll('p,td,th,button,h1,h2,h3,h4,span,a')].some(e=>{
+  if(e.closest('nav,aside,header')||e.querySelector('table,form'))return false;
+  if(e.matches('a[href]')){try{if(C.route(new URL(e.getAttribute('href'),ctx.url).href)!==ctx.url)return false;}catch{return false;}}
+  return new RegExp('^'+standard.replace(/\./g,'\\.')+'(?:\\s|$)').test(e.textContent.trim());
+ });
+ if(!hint)throw Error('Nombor standard sumber tidak ditemui pada kandungan borang.');
+ if(ctx.unitName&&!([...doc.querySelectorAll('td,th,p,h1,h2,h3,h4')].some(e=>!e.querySelector('table,form')&&!e.closest('nav,aside,header')&&C.unitName(e.textContent)===C.unitName(ctx.unitName))))throw Error('Nama unit pada borang tidak sepadan.');
  const forms=[...doc.querySelectorAll('form')].filter(f=>f.querySelector('input[type=radio][name^=skor]'));
  if(forms.length!==1)throw Error('Borang skor tunggal tidak ditemui.');
  const form=forms[0],action=new URL(form.getAttribute('action')||ctx.url,ctx.url);
@@ -32,13 +43,18 @@ function apply(ctx,expected){
  if(!C.same(after.identity,r.identity)||after.fields.some(f=>f.current!==f.value))throw Error('Identiti / skor berubah selepas isi. Tidak dihantar.');
  r.form.requestSubmit(buttons[0]);return {submitted:true};
 }
-async function verify(ctx,expected){
- // Read fresh server HTML. Never use DOM values changed by the extension as proof.
- const res=await fetch(ctx.url,{credentials:'same-origin',cache:'no-store',redirect:'follow'});
+async function probe(ctx){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ let res;try{res=await fetch(ctx.url,{credentials:'same-origin',cache:'no-store',redirect:'follow',signal:controller.signal});}finally{clearTimeout(timer);}
  if(!res.ok||C.route(res.url)!==ctx.url)throw Error('Respons pelayan / laluan berubah.');
  const doc=new DOMParser().parseFromString(await res.text(),'text/html'),r=read(doc,ctx);
+ return {fields:r.fields,identity:r.identity};
+}
+async function verify(ctx,expected){
+ // Fresh server GET, never the values just filled in the current DOM.
+ const r=await probe(ctx);
  if(!C.same(r.identity,expected.identity))throw Error('Identiti respons pelayan berbeza.');
  return {ok:r.fields.every(f=>f.current===f.value),fields:r.fields};
 }
-globalThis.ReliablePage={inspect,apply,verify};
+globalThis.ReliablePage={inspect,apply,verify,probe};
 })();

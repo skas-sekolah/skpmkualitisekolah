@@ -1,7 +1,7 @@
 (()=>{
 const C=ReliableCore,clean=e=>(e?.textContent||'').replace(/\s+/g,' ').trim();
 const code=s=>String(s||'').match(/^(?:ASPEK\s*:?\s*)?([123](?:\.\d+){1,3})(?:\s|$)/i)?.[1]||null;
-const name=s=>String(s||'').toUpperCase().replace(/\s*\((SR|SM)\)\s*$/,'').replace(/^(?:(PANITIA|MATA PELAJARAN|KELAB|PERSATUAN)\s+)+/,'').replace(/[^A-Z0-9]/g,'');
+const name=C.unitName;
 function extract(doc,url,records){
  const out=[],links=[],unitRows=[];
  const add=(record,raw,unit)=>{try{const target=C.context(new URL(raw,url).href,record,new URL(url).searchParams.get('tahun'));out.push({id:record.id,url:target,unit:unit||null});}catch{}};
@@ -34,7 +34,7 @@ function extract(doc,url,records){
 }
 async function discover(ctx,pack){
  const records=pack.modules.management.records,queue=[ctx.url],seen=new Set(),targets=[],warnings=[],unitRows=[];
- const started=Date.now();while(queue.length&&seen.size<80&&Date.now()-started<90000){
+ const started=Date.now();while(queue.length&&seen.size<180&&Date.now()-started<180000){
   const url=queue.shift();if(seen.has(url))continue;seen.add(url);
   try{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);

@@ -1,0 +1,52 @@
+name: MOEIS extension tests and package
+on:
+  push:
+    branches: [feature/moeis-batch-080]
+    paths:
+      - 'extensions/moeis-reliable/**'
+      - '.github/workflows/moeis-extension.yml'
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install extension test dependencies
+        working-directory: extensions/moeis-reliable
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Syntax and regression tests
+        working-directory: extensions/moeis-reliable
+        run: |
+          for file in *.js; do node --check "$file"; done
+          npm test
+      - name: Package extension with root manifest
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, zipfile
+          root = pathlib.Path('extensions/moeis-reliable')
+          version = json.loads((root / 'manifest.json').read_text())['version']
+          output = pathlib.Path('SKAS-MOEIS-Extension-v' + version + '.zip')
+          names = [p for p in root.iterdir() if p.is_file() and p.name not in ('package.json', 'package-lock.json')]
+          with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+              for source in names:
+                  archive.write(source, source.name)
+          with zipfile.ZipFile(output) as archive:
+              assert 'manifest.json' in archive.namelist()
+              manifest = json.loads(archive.read('manifest.json'))
+              for required in (manifest['background']['service_worker'], manifest['action']['default_popup'], 'core.js', 'page.js', 'batch.html', 'batch-runner.js', 'batch-core.js', 'batch-page.js', 'batch-ui.js', 'popup.js'):
+                  assert required in archive.namelist(), required
+          print(output)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SKAS-MOEIS-Extension-v0.8.1
+          path: SKAS-MOEIS-Extension-v0.8.1.zip
+      - name: Publish tested extension download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create moeis-v0.8.1 SKAS-MOEIS-Extension-v0.8.1.zip --target "$GITHUB_SHA" --title "SKAS MOEIS Extension v0.8.1" --notes "Regression-tested route candidate validation and main-content heading checks. Live MOEIS persistence has not been tested from the build environment."

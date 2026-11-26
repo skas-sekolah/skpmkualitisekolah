@@ -10,15 +10,35 @@ async function navigateBatch(ctx){
  for(let i=0;i<120;i++){await delay(250);const t=await chrome.tabs.get(ctx.tabId);if(t.status==='complete'){if(ReliableCore.route(t.url)!==ctx.url)throw Error('Alamat borang berbeza daripada pautan asal.');await delay(350);return;}}
  throw Error('Halaman terlalu lambat.');
 }
+
+async function resolveBatchCandidates(tabId,record,pack,candidates,result){
+ const unique=[...new Map(candidates.map(c=>[ReliableCore.context(c.url,record,pack.year),c])).values()];
+ if(!unique.length)throw Error('Pautan / nama unit tidak ditemui.');
+ if(unique.length>12)throw Error('Terlalu banyak calon pautan; perlu semakan manual.');
+ result.candidates=[];const valid=[];
+ for(const route of unique){
+  if(batchStop)throw Error('Proses dihentikan sebelum Simpan.');
+  const ctx={tabId,url:ReliableCore.context(route.url,record,pack.year),record,schoolCode:pack.schoolCode,year:pack.year,...(route.unit?{unitName:route.unit}:{})};
+  try{
+   const snapshot=await call(ctx,'probe');
+   valid.push({ctx,snapshot});result.candidates.push({url:ctx.url,status:'validated'});
+  }catch(e){result.candidates.push({url:ctx.url,status:'rejected',message:e.message});if(ReliableBatchCore.fatal(e.message))throw e;}
+ }
+ if(!valid.length)throw Error('Tiada calon borang lulus semakan: '+result.candidates.map(c=>c.message).join(' | '));
+ // Multiple URLs may refer to the same form, but never merge distinct or missing identities.
+ if(valid.length>1&&(!valid[0].snapshot.identity.length||valid.some(v=>!ReliableCore.same(v.snapshot,valid[0].snapshot))))throw Error('Lebih satu identiti borang yang sah; tidak dipilih secara rawak.');
+ const selected=valid[0];result.chosenUrl=selected.ctx.url;result.candidateCount=unique.length;
+ return selected;
+}
+
 async function runBatch(tabId,pack,mode){
- batchStop=false;const records=pack.modules.management.records,job={version:'0.8.0',running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
+ batchStop=false;const records=pack.modules.management.records,job={version:'0.8.1',running:true,status:'discovering',results:[],message:'Mencari pautan menu dan unit…',summary:ReliableBatchCore.totals(records,[])};
  const persist=async()=>{job.summary=ReliableBatchCore.totals(records,job.results);job.updatedAt=new Date().toISOString();await chrome.storage.local.set({reliableBatch:job});};
  try{
   await persist();const tab=await chrome.tabs.get(tabId),base=ReliableCore.route(tab.url);
   const found=await discoverBatch({tabId,url:base},pack),routes=ReliableBatchCore.uniqueRoutes(found.targets);
   job.discovery={visited:found.visited,warnings:found.warnings,unitRows:found.unitRows};job.status='filling';
-  // Reject a shared URL claimed for different source records.
-  const uses=new Map();for(const list of routes.values())for(const t of list.values())uses.set(t.url,(uses.get(t.url)||0)+1);
+  const claimed=new Map();
   for(const record of records){
    if(batchStop)break;const count=ReliableCore.scores(record).length;
    job.message='Memproses '+record.title;await persist();
@@ -27,10 +47,12 @@ async function runBatch(tabId,pack,mode){
     if(record.readOnly||!count){result.status='empty-skipped';result.message='Tiada skor boleh diisi / rekod rujukan.';}
     else{
      const candidates=[...(routes.get(record.id)?.values()||[])];
-     if(candidates.length!==1)throw Error(candidates.length?'Lebih satu pautan; padanan tidak pasti.':'Pautan / nama unit tidak ditemui.');
-     const route=candidates[0];if(uses.get(route.url)!==1)throw Error('Pautan sama digunakan rekod lain.');
-     const ctx={tabId,url:ReliableCore.context(route.url,record,pack.year),record,schoolCode:pack.schoolCode,year:pack.year};
+     const {ctx,snapshot}=await resolveBatchCandidates(tabId,record,pack,candidates,result);
+     const identityKey=JSON.stringify({group:ReliableCore.group(record.id.split(':')[0]),identity:snapshot.identity});
+     if(claimed.has(ctx.url)||snapshot.identity.length&&claimed.has(identityKey))throw Error('Borang yang sama sudah dipadankan dengan rekod lain.');
+     claimed.set(ctx.url,record.id);if(snapshot.identity.length)claimed.set(identityKey,record.id);
      await navigateBatch(ctx);const expected=await call(ctx,'inspect');
+     if(!ReliableCore.same(snapshot,expected))throw Error('Borang berubah selepas semakan calon; tidak diisi.');
      if(expected.fields.every(f=>f.current===f.value)){
       const verified=await call(ctx,'verify',expected);
       if(!verified.ok)throw Error('Skor sedia ada tidak disahkan pada pelayan.');
