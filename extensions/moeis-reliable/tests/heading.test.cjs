@@ -3,7 +3,7 @@ const root=path.join(__dirname,'..'),url='https://moeisins.moe.gov.my/SJN/penila
 const radios=[0,1,2,3,4].map(v=>'<input type="radio" name="skor1" value="'+v+'">').join('');
 const form='<form method="post" action="save"><input type="hidden" name="id_kokurikulum" value="270">'+radios+'<button type="submit">Simpan</button></form>';
 function fixture(header,unit='BOLA SEPAK (SR)',code='3.2.4.1'){
- const html='<body>BBA8284<nav><h2>STANDARD 3.1: KURIKULUM</h2><a>STANDARD 3.3: HEM</a><a>'+code+'</a></nav>'+header+'<p>'+code+'</p><table><tr><td>Pengurusan Sukan/Permainan</td><td>'+unit+'</td></tr></table>'+form+'</body>';
+ const html='<body>BBA8284 <nav><h2>STANDARD 3.1: KURIKULUM</h2><a>STANDARD 3.3: HEM</a><a>'+code+'</a></nav>'+header+'<p>'+code+'</p><table><tr><td>Pengurusan Sukan/Permainan</td><td>'+unit+'</td></tr></table>'+form+'</body>';
  const dom=new JSDOM(html,{url,runScripts:'outside-only'}),w=dom.window;
  for(const f of ['core.js','page.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
  return {dom,w,ctx:{url:w.ReliableCore.route(url),year:2026,schoolCode:'BBA8284',unitName:'BOLA SEPAK (SR)',record:{id:'3.2.4.1:fixture',fields:[{key:'scores.a',value:4}]}}};
